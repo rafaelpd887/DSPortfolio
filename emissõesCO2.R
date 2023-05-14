@@ -223,4 +223,4 @@ plot(FuelConsumption_dummies$CO2EMISSIONS ~ FuelConsumption_dummies$yhat_step_bc
 
 
 
-rm()
+
