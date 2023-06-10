@@ -1,0 +1,258 @@
+---
+title: "Desenvolvendo um modelo preditivo para estimar as emissões de CO2 pelos automóveis"
+author: "Rafael"
+date: "2023-05-05"
+output: html_document
+---
+À medida que a população mundial continua a crescer, o uso de automóveis tornou-se uma parte essencial da vida moderna. No entanto, as emissões que os automóveis produzem tornaram-se uma grande preocupação para cientistas e formuladores de políticas. O dióxido de carbono (CO2) é um dos principais gases produzidos pelos automóveis e é conhecido por ter um impacto significativo no meio ambiente.
+
+Neste trabalho de pesquisa, é apresentado um modelo de regressão linear que analisa um banco de dados de automóveis de uma concessionária canadense para identificar as características dos automóveis que têm mais impacto nas emissões de CO2. Ao fazer isso, será possível fornecer aos formuladores de políticas e aos fabricantes de automóveis informações valiosas que possam ajudá-los a reduzir o impacto ambiental dos automóveis.
+
+Ao final, teremos um modelo linear com transformação de Box-Cox que apresenta as emissões de CO2 como variável dependente e as varias características dos automóveis como variáveis independentes.
+
+**Banco de dados utilizado:**  
+[FuelConsumption (favor clicar com botão direito do mouse e selecionar abrir em nova aba/janela)](https://github.com/rafaelpd887/DSPortfolio/blob/main/CO2Emissions/FuelConsumption.csv)
+
+| Código | Combustível       |
+|:------:|:-----------------:|
+|   D    | Diesel            |
+|   E    | Etanol            |
+|   X    | Gasolina          |
+|   Z    | Gasolina Premium  |
+
+| Código | Transmissão                     |
+|:------:|:-------------------------------:|
+| A      | Automática                      |
+| AM     | Manual Automática               |
+| AS     | Automática Sequencial           |
+| AV     | Automática de Variação Contínua |
+| M      | Manual                          |
+
+# Carregando os pacotes necessários
+```{r pacotes, message=FALSE, results='hide'}
+pacotes <- c("kableExtra", "utils", "plotly", "dplyr", "rstatix", "jtools", "equatiomatic", "cowplot", "olsrr", "nortest", "car", "PerformanceAnalytics", "fastDummies", "ggplot2")
+lapply(pacotes, library, character.only = TRUE)
+```
+
+# Carregando e salvando o banco de dados no R
+```{r carregamento e salvamento do banco de dados}
+FuelConsumption <- read.csv("FuelConsumption.csv")
+save(FuelConsumption, file = "FuelConsumption.RData")
+```
+# Analise inicial das variáveis
+```{r view1}
+View(FuelConsumption)
+```
+```{r banco1, echo=FALSE}
+FuelConsumption %>%
+  slice(1:10) %>%
+  kable(format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  scroll_box(width = "100%", height = "150px")
+```
+A variável MODELYEAR, que representa o ano de fabricação do automóvel, possui o mesmo valor em todas as observações(o banco de dados completo pode ser visualizado no link disponibilizado no inicio deste documento). Logo, podemos constatar o que a mesma não terá influencia no modelo e ocasionará em um aumento inútil da quantidade de dados a serem processados. Por esse motivo, vamos eliminá-la do nosso banco de dados.
+```{r eliminando colunas1}
+dropyear <- FuelConsumption[-c(1)]
+```
+Além disso, é possível perceber também que a variável MODEL possui níveis que muito pouco se repetem nas 1067 observações. Consequentemente, a variável não consegue formar padrões ou tendências significativas que possam ajudar o modelo a fazer previsões ou inferências precisas. Assim sendo, também iremos eliminar essa variável.
+```{r eliminando colunas2}
+dropyear2 <- dropyear[-c(2)]
+```
+Visualizando o novo banco de dados:
+```{r view2}
+View(dropyear2)
+```
+```{r banco2, echo=FALSE}
+dropyear2 %>%
+  slice(1:10) %>%
+  kable(format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  scroll_box(width = "100%", height = "150px")
+```
+# Visualizando e alterando o tipo das variáveis
+```{r glimpse}
+glimpse(dropyear2) 
+```
+Aqui podemos ver que algumas das variáveis estão tipificadas como "intenger". Como algumas funções a serem usadas durante esta modelagem exigem que as variáveis sejam do tipo "numeric", vamos alterar o tipo das variáveis "intenger" para "numeric".
+```{r transformação dos tipos das variáveis}
+FuelConsumption$CYLINDERS <- as.numeric(dropyear$CYLINDERS)
+FuelConsumption$FUELCONSUMPTION_COMB_MPG <- as.numeric(dropyear$FUELCONSUMPTION_COMB_MPG)
+FuelConsumption$CO2EMISSIONS <- as.numeric(dropyear$CO2EMISSIONS)
+```
+Conferindo o resultado das alterações nos tipos das variáveis:
+```{r glimpse2}
+glimpse(dropyear) 
+```
+# Estatísticas das variáveis
+```{r summary1}
+summary(FuelConsumption)
+```
+Categorias das variáveis categóricas:
+```{r levels}
+levels(factor(FuelConsumption$MAKE))
+levels(factor(FuelConsumption$VEHICLECLASS))
+levels(factor(FuelConsumption$TRANSMISSION))
+levels(factor(FuelConsumption$FUELTYPE))
+```
+Frequencia das variáveis categóricas:
+```{r table}
+table(FuelConsumption$MAKE)
+table(FuelConsumption$VEHICLECLASS)
+table(FuelConsumption$TRANSMISSION)
+table(FuelConsumption$FUELTYPE)
+```
+# Verificando as correlações entre as variáveis numéricas a serem utilizadas 
+```{r correlation, warning=FALSE}
+chart.Correlation((FuelConsumption[, c(5, 6, 9:13)]), histogram = TRUE)
+```
+
+<span style="font-size: smaller;"> _enginesize, cylinders, fuelconsumption_city, fuelcomsumption_hwy, fuelconsumption_comb, fuelconsumption_comb_mpg, co2emissions_
+
+Como era de se esperar, as variáveis referentes ao consumo de combustível possuem alto grau de correlação entre si, pois ambas estão relacionadas ao consumo de combustível em diferentes contextos de direção. Se há um aumento no consumo de combustível na cidade, é provável que haja um aumento correspondente no consumo de combustível na estrada, e vice-versa. Essa relação positiva entre as duas variáveis resulta em um alto grau de correlação entre elas. Este é um típico exemplo de colinearidade que vamos resolver através do algoritmo de stepwise para evitar problemas no modelo final.
+
+# Dummização das variáveis categóricas
+
+Antes de prosseguirmos, precisamos converter nossas variáveis categóricas para valores numéricos. Para tal, utilizaremos o processo de dummização, também conhecido por codificação one-hot. Neste caso, será usada a categoria mais frequente de cada variável categórica como referência para a estimação dos valores dos parâmetros das variáveis dummies. A frequência dessas variáveis pode ser conferida logo acima em "Estatísticas das variáveis".
+```{r dummies}
+FuelConsumption_dummies <- dummy_columns(.data = dropyear2,
+                                    select_columns = "MAKE",
+                                    remove_selected_columns = T,
+                                    remove_most_frequent_dummy = T)
+
+FuelConsumption_dummies <- dummy_columns(.data = FuelConsumption_dummies,
+                                         select_columns = "VEHICLECLASS",
+                                         remove_selected_columns = T,
+                                         remove_most_frequent_dummy = T)
+
+FuelConsumption_dummies <- dummy_columns(.data = FuelConsumption_dummies,
+                                         select_columns = "TRANSMISSION",
+                                         remove_selected_columns = T,
+                                         remove_most_frequent_dummy = T)
+
+FuelConsumption_dummies <- dummy_columns(.data = FuelConsumption_dummies,
+                                         select_columns = "FUELTYPE",
+                                         remove_selected_columns = T,
+                                         remove_most_frequent_dummy = T)
+```
+Com as variáveis categóricas dummizadas, podemos começar a criar o nosso modelo.
+
+# Modelando
+O processo de dummização aumentou consideravelmente o nosso número de variáveis, de 11 para 90, logo é improvável que todas essas variáveis sejam significativas para o nosso para  modelo. Adicionalmente, em nossa análise de correlação, foi possível notar a presença de colinearidade entre algumas variáveis. Afim de eliminar variáveis não significativas, vamos criar um modelo linear OLS inicial com todas as variáveis que possa ser usado como base durante a função `step`.
+```{r model1}
+modelo_FuelConsumption <- lm(formula = CO2EMISSIONS ~ ., data = FuelConsumption_dummies)
+```
+Agora que temos o nosso primeiro modelo, podemos executar o algorítmo de Stepwise no mesmo através da função `step`:
+```{r model2, results='hide'}
+step_FuelConsumption <- step(modelo_FuelConsumption, k = qchisq(p = 0.05, df = 1, lower.tail = FALSE))
+```
+<span style="font-size: smaller;"> _o valor "k" é usado como um limite crítico para a estatística qui-quadrado, e nesse caso estamos buscando uma seleção de variáveis com um nível de confiança de 95%._
+
+Vamos usar a função `summary` para avaliar os parâmetros do nosso modelo:
+```{r smr1}
+summary(step_FuelConsumption)
+```
+Podemos ver que a função `step` manteve as variáveis "fuelconsumption_comb" e "fuelconsumption_comb_mpg" apesar da alta correlação entre as duas apontada na tabela de correlação. Vamos verificar os valores dos fatores de inflação da variância usando a funçao `vif`.
+```{r vif1}
+vif(step_FuelConsumption)
+```
+Sabendo que valores muito acima de 1 indicam presença de colinearidade, podemos assumir que "fuelconsumption_comb" e "fuelconsumption_comb_mpg" possuem uma alta colinearidade. Como a alta colinearidade pode ser prejudicial ao modelo, vamos eliminar a variável com o maior VIF apresentado para evitar a multicolinearidade.
+```{r eliminandocolunas3}
+step_FuelConsumption2 <- update(step_FuelConsumption, CO2EMISSIONS ~ .- FUELCONSUMPTION_COMB, data = FuelConsumption_dummies)
+```
+Olhando os novos valores de VIF:
+```{r vif2}
+vif(step_FuelConsumption2)
+```
+Podemos ver que os valores reduziram consideravelmente. Vamos usar a função `step` no novo modelo e então iremos testar se o mesmo apresenta heterocedasticidade, presença de variância não constante nos resíduos de um modelo, e se seus resíduos são aderentes à normalidade. Vamos usar, respectivamente, os testes de Breusch-Pagan(`ols_test_breusch_pagan`) e Shapiro-Francia(`sf.test`) para tal.
+```{r model3, results='hide'}
+step_FuelConsumption3 <- step(step_FuelConsumption2, k = 3.841459)
+```
+<span style="font-size: smaller;"> _o valor "k" é usado como um limite crítico para a estatística qui-quadrado, e nesse caso estamos buscando uma seleção de variáveis com um nível de confiança de 95%._
+```{r testes}
+ols_test_breusch_pagan(step_FuelConsumption3)
+sf.test(step_FuelConsumption3$residuals)
+```
+Pelos resultados apresentados pelos testes, é possível concluir que o atual modelo possui uma variância heterocedastica em seus resíduos, pois o valor-p (2.336652e-23) é menor do que o nível de significância comumente utilizado de 0,05. Podemos concluir também que os resíduos parecem não seguir uma distribuição normal, já que o valor-p (2.2e-16) também é menor do que o nível de significância de 0,05. Apesar de um modelo com essas características ainda possuir potencial preditivo, tais características podem indicar que o modelo ainda possa ser aprimorado. Tentaremos aprimorar a capacidade preditiva do nosso modelo através da transformação de Box-Cox na sua variável dependente.
+
+# A transformação de Box-Cox
+A transformação de Box-Cox é uma técnica estatística utilizada para estabilizar a variância e/ou aproximar a distribuição dos dados para uma distribuição normal. Portanto, ela pode nos auxiliar a reduzir a heterocedasticidade do modelo, e melhorar a aderência dos seus resíduos à normalidade. A transformação de Box-Cox é definida por uma equação paramétrica, onde um parâmetro lambda (λ) é aplicado aos dados. Vamos definir o valor de lambda (λ) para nossa variável dependente através da função `powerTransform` do pacote `car`.
+```{r lambda}
+lambda_BC <- powerTransform(dropyear2$CO2EMISSIONS)
+lambda_BC
+```
+Com o valor de lambda (λ) em mãos, nos resta executar a transformação da nossa variável dependente. Sabemos que a transformação a ser realizada varia de acordo com o valor de lambda (λ):
+*Se lambda for igual a 0, uma transformação logarítmica é aplicada aos dados.
+*Se lambda for diferente de 0, a transformação é dada pela fórmula: ((x^lambda) - 1) / lambda, onde x é o valor original dos dados.
+Como o nosso lambda (λ) é diferente de 0, basta executarmos o seguinte código para inserirmos a nossa variável dependente transformada no nosso banco de dados:
+```{r lambda2}
+FuelConsumption_dummies$bcCO2EMISSIONS <- (((dropyear2$CO2EMISSIONS ^ lambda_BC$lambda) - 1) / lambda_BC$lambda)
+```
+# Modelando com Box-Cox
+Vamos estimar um novo modelando usando a variável dependente com transformação de Box-Cox:
+```{r model4}
+modelo_bc_FuelConsumption <- lm(formula = bcCO2EMISSIONS ~ .-CO2EMISSIONS, 
+                           data = FuelConsumption_dummies)
+```
+Visto que este é um novo modelo, precisamos executar novamente o algorítmo de Stepwise através da função `step` para eliminar variáveis não significativas.
+```{r model5, results='hide'}
+step_bc_FuelConsumption <- step(modelo_bc_FuelConsumption, k = 3.841459)
+```
+<span style="font-size: smaller;"> _o valor "k" é usado como um limite crítico para a estatística qui-quadrado, e nesse caso estamos buscando uma seleção de variáveis com um nível de confiança de 95%._
+
+Verificando os valores de VIF em nosso novo modelo:
+```{r vif3}
+vif(step_bc_FuelConsumption)
+```
+Como esperado, novamente as variáveis relacionadas ao consumo de combustível apresentam uma alta colinearidade. Nota-se também, que a função `step` não eliminou a variável "FUELCONSUMPTION_CITY" como havia eliminado no modelo sem a transformação de Box-Cox. Eliminaremos os valores mais altos de VIF para tentarmos garantir a eficácia preditiva do modelo:
+```{r removendo colunas 4}
+step_bc_FuelConsumption2 <- update(step_bc_FuelConsumption, bcCO2EMISSIONS ~ .- FUELCONSUMPTION_COMB - FUELCONSUMPTION_CITY, data = FuelConsumption_dummies)
+```
+Como as variáveis do nosso modelo foram alteradas, precisamos usar novamente a função `step`:
+```{r model6, results='hide'}
+step_bc_FuelConsumption3 <- step(step_bc_FuelConsumption2, k = 3.841459)
+```
+<span style="font-size: smaller;"> _o valor "k" é usado como um limite crítico para a estatística qui-quadrado, e nesse caso estamos buscando uma seleção de variáveis com um nível de confiança de 95%._
+
+Conferindo os novos valores de VIF:
+```{r vif4}
+vif(step_bc_FuelConsumption3)
+```
+Com os valores de VIF consideravelmente reduzidos, podemos agora partir para os testes de Breusch-Pagan(`ols_test_breusch_pagan`) e Shapiro-Francia(`sf.test`). Vamos aproveitar também para avaliar os parâmetros do modelo usando `summary`:
+```{r testes2}
+summary(step_bc_FuelConsumption3)
+ols_test_breusch_pagan(step_bc_FuelConsumption3)
+sf.test(step_bc_FuelConsumption3$residuals)
+```
+Pelos resultados apresentados, podemos concluir que foi obtido um modelo superior ao modelo cuja variável dependente não havia sofrido a transformação de Box-Cox. Temos um alto valor de R² e variáveis indepedentes com um nível de significância superior a 95%. O novo modelo também apresentou durante o teste `ols_test_breusch_pagan` um valor p maior que 0,05, indicando a ausência de heterocedasticidade. Contudo, apesar dos esforços, não foi possível ajustar os resíduos à normalidade, pois o valor p associado ao teste `sf.test` continua sendo menor que 0,05.
+
+Entretanto, apesar da normalidade dos resíduos ser uma suposição comum em muitos modelos estatísticos, ela nem sempre é necessária para obter previsões precisas. Segundo Wilcox (1998), mesmo que os resíduos de uma regressão linear não sigam uma distribuição normal, as previsões podem ser precisas e os testes de hipótese ainda podem ter poder satisfatório, desde que outras suposições do modelo sejam atendidas. 
+Podemos conferir a capacidade preditiva do nosso modelo pelo gráfico abaixo:
+```{r graph}
+FuelConsumption_dummies$fitted_step3 <- step_bc_FuelConsumption3$fitted.values
+plot(FuelConsumption_dummies$CO2EMISSIONS ~ FuelConsumption_dummies$fitted_step3,
+     xlab = "Valores estimados de emissões de CO2(boxcox)",
+     ylab = "Valores observados de emissões de CO2")
+```
+
+Os valores resultantes do nosso modelo precisam passar por uma transformação inversa àquela feita durante a transformação de Box-Cox para que tenhamos os valores reais das emissões de CO2:
+```{r boxcoxinverso, eval=FALSE}
+((bcCO2EMISSIONS*(lambda_BC$lambda))+
+    1)^(1/(lambda_BC$lambda))
+```
+# Modelo Final
+```{r modelimage, echo=FALSE}
+extract_eq(step_bc_FuelConsumption3, use_coefs = T,
+           wrap = T, show_distribution = T) %>%
+  kable(format = "html", escape = FALSE) %>%
+  kable_styling(bootstrap_options = "striped",
+                full_width = F,
+                font_size = 10) %>%
+  scroll_box(width = "100%", height = "150px")
+```
+Os resultados da análise mostraram que o modelo final é uma ferramenta confiável e precisa para prever a quantidade de emissões de CO2 dos automóveis. O poder preditivo do modelo foi validado por sua capacidade de prever as emissões de CO2 de diferentes tipos de automóveis com alta precisão. Além disso, o modelo fornece informações valiosas sobre os fatores que influenciam as emissões de CO2, incluindo fabricante do automóvel, tipo de chassi do automóvel, tipo de combustível usado, tipo de transmissão e consumo combinado de combustível em milhas.
+
+No geral, este documento demonstra o valor do uso de análises de dados e técnicas de modelagem estatística para abordar questões ambientais importantes. Pesquisas futuras podem se concentrar em expandir o modelo para incluir outros fatores que podem influenciar as emissões de CO2 e explorar o potencial do uso de algoritmos de aprendizado de máquina para melhorar a precisão e o poder preditivo do modelo.
+
+# Referências
+
+Wilcox, R. R. (1998). Do we really need the normality assumption for linear regression? The American Statistician, 52(2), 162-166.
