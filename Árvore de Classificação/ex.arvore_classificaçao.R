@@ -163,7 +163,7 @@ CurvaROC2
 # Árvore podada (Grid Search) #
 ###############################
 
-## Vamos definir e salvar o menor "complexity parameter" em um obj. chamado "cp_min"
+## Vamos definir e salvar o cp "ótimo" em um obj. chamado "cp_min"
 tab_cp <- rpart::printcp(arvore)
 tab_cp
 
