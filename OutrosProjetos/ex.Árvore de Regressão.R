@@ -88,7 +88,7 @@ grafico1(tips, "p", "tip", "r")
 #######################################
 
 ######################################
-# 2.1 treinar a árvore sem travas
+# 2.1 treinando a árvore sem travas
 ######################################
 
 tree_hm <- rpart(tip~.,
@@ -104,7 +104,7 @@ tips$p %>% tail # investigar a previsão
 tips['r_hm'] = tips$tip - tips$p_hm
 
 ######################################
-# 2.2 avaliar a árvore hm           ##
+# 2.2 avaliando a árvore hm           ##
 ######################################
 
 metricas(tips, "p_hm", "tip")
@@ -120,7 +120,7 @@ tab_cp <- rpart::printcp(tree_hm)
 rpart::plotcp(tree_hm)
 
 ######################################
-# 2.4 Escolher o caminho que otimiza a impureza no cross validation
+# 2.4 Escolhendo o caminho que otimiza a impureza no cross validation
 ######################################
 
 tab_cp[which.min(tab_cp[,'xerror']),]
@@ -140,7 +140,7 @@ tips$p %>% tail # investigar a previsão
 tips['r_tune'] = tips$tip - tips$p_tune
 
 ##############################################
-## 2.5) Avaliar a árvore tunada             ##
+## 2.5 Avaliando a árvore tunada             ##
 ##############################################
 metricas(tips, "p_tune", "tip")
 grafico1(tips, "p_tune", "tip", "r_tune")
