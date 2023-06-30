@@ -140,7 +140,7 @@ tips$p %>% tail # investigar a previsão
 tips['r_tune'] = tips$tip - tips$p_tune
 
 ##############################################
-## 2.5) Avaliando a árvore tunada           ##
+## 2.5 Avaliando a árvore tunada            ##
 ##############################################
 metricas(tips, "p_tune", "tip")
 grafico1(tips, "p_tune", "tip", "r_tune")
