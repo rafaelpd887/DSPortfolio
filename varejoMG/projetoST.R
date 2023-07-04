@@ -20,15 +20,9 @@ if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
 # vendas no varejo do estado de Minas Gerais. Vamos utilizar o indice do IBGE como
 # série temporal, e estimaremos um modelo ARIMA com ajuste de volatilidade condicional(GARCH)
 # nas previsões e um modelo ETS. No final iremos comparar e analisar as previsões de ambos.
-# Buscando a série do Índice de Volume de Vendas de SP, MG e RJ
-# Pelo pacote BETS - Brazilian Economic Time Series ou GetBCBData
-# Todas as 3 séries possuem índice de base fixa referente à média mensal dos volumes de vendas do ano de 2014. 
-
-# Alternativa: pacote: GetBCBData
 
 
-
-#Minas Gerais
+#varejo Minas Gerais
 varejoMG=gbcbd_get_series(1472,first.date='2000-01-01')
 TSvarejoMG=ts(varejoMG[2], start = c(2000,1), end = c(2022,12), frequency = 12)
 dygraph(TSvarejoMG)
