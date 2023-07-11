@@ -1,5 +1,6 @@
-# Outros Projetos
-Este repositório abriga projetos que exploram e técnicas e algoritmos diferentes daqueles abordados na landing page do portfolio.
-* [Exercício Árvore de Classificação](https://rpubs.com/rafaelpd/1059753)
-* [Exercício Árvore de Regressão](https://rpubs.com/rafaelpd/1059662)
-* [Exercício Floresta Aleatória (regressão)](https://rpubs.com/rafaelpd/1059705)
+# Other Projects
+This repository houses projects that explore different techniques and algorithms than those covered in the portfolio landing page.
+* [Classification Tree Exercise](https://rpubs.com/rafaelpd/1059753)
+* [Regression Tree Exercise](https://rpubs.com/rafaelpd/1059662)
+* [Random Forest Exercise (regression)](https://rpubs.com/rafaelpd/1059705)
+* [XGBoost Exercise](https://rpubs.com/rafaelpd/1061869)
