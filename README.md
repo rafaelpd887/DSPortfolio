@@ -1,2 +1,3 @@
 # Rafael_Portfolio
-projetos relacionados a ciência de dados
+Data Science projects
+[Link to my Landing Page](https://rafaelpd.netlify.app)
