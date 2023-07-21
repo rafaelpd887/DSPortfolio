@@ -72,3 +72,4 @@ nn_final <- neuralnet(fuel_economy_combined ~ .,
 pred2 <- predict(nn_final, m)
 plot(x = pred2, y = df$fuel_economy_combined)
 caret::postResample(pred2, df$fuel_economy_combined)
+plot(nn_final)
