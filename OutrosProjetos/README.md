@@ -4,4 +4,4 @@ This repository houses projects that explore different techniques and algorithms
 * [Regression Tree Exercise](https://rpubs.com/rafaelpd/1059662)
 * [Random Forest Exercise (regression)](https://rpubs.com/rafaelpd/1059705)
 * [XGBoost Exercise](https://rpubs.com/rafaelpd/1061869)
-* [Neural Network Exercise (cooming soon)](https://rpubs.com/rafaelpd/1061869)
+* [Neural Network Exercise (cooming soon)](https://rpubs.com/rafaelpd/1061874)
