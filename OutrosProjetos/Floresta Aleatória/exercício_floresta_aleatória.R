@@ -1,83 +1,85 @@
-# Instalação de pacotes
-pacotes <- c('tidyverse','rpart','rpart.plot','gtools','Rmisc','scales','viridis','caret','AMR','randomForest','fastDummies','rattle','xgboost','ggpubr','reshape2','mlbench')
+# Package Installation
+packages <- c('tidyverse','rpart','rpart.plot','gtools','Rmisc','scales','viridis','caret','AMR','randomForest','fastDummies','rattle','xgboost','ggpubr','reshape2','mlbench')
 
-if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
-  instalador <- pacotes[!pacotes %in% installed.packages()]
-  for(i in 1:length(instalador)) {
-    install.packages(instalador, dependencies = T)
-    break()}
-  sapply(pacotes, require, character = T) 
+if(sum(as.numeric(!packages %in% installed.packages())) != 0){
+  installer <- packages[!packages %in% installed.packages()]
+  for(i in 1:length(installer)) {
+    install.packages(installer, dependencies = TRUE)
+    break()
+  }
+  sapply(packages, require, character = TRUE) 
 } else {
-  sapply(pacotes, require, character = T) }
+  sapply(packages, require, character = TRUE) 
+}
 
-# Carregando a base de dados Housing
+# Loading the Housing dataset
 data(BostonHousing)
 
-# Visualizando as primeiras linhas da base de dados
+# Viewing the first rows of the dataset
 head(BostonHousing)
 
 #######################################
-# Dicionário de dados:                #
+# Data Dictionary:                    #
 #######################################
 
-# CRIM: Taxa de criminalidade per capita por região.
-# ZN: Proporção de terrenos residenciais divididos em lotes com mais de 25.000 pés quadrados (cerca de 2.322 metros quadrados).
-# INDUS: Proporção de acres não comerciais por cidade.
-# CHAS: Variável fictícia (dummy) que indica se o imóvel faz fronteira com o rio Charles (1 se faz fronteira, 0 caso contrário).
-# NOX: Concentração de óxidos nítricos (partes por 10 milhões).
-# RM: Média de número de quartos por habitação.
-# AGE: Proporção de unidades ocupadas pelos proprietários construídas antes de 1940.
-# DIS: Distância ponderada até cinco centros de emprego em Boston.
-# RAD: Índice de acessibilidade a rodovias radiais.
-# TAX: Taxa de imposto sobre propriedades de valor total por $10.000.
-# PTRATIO: Razão aluno-professor por cidade.
-# B: 1000(Bk - 0.63)^2, onde Bk é a proporção de pessoas de origem afro-americana por cidade.
-# LSTAT: Porcentagem de status inferior da população.
-# MEDV: Valor mediano das residências ocupadas pelos proprietários em milhares de dólares.
+# CRIM: Per capita crime rate by town.
+# ZN: Proportion of residential land zoned for large lots (over 25,000 sq. ft.).
+# INDUS: Proportion of non-retail business acres per town.
+# CHAS: Charles River dummy variable (1 if tract bounds river; 0 otherwise).
+# NOX: Nitrogen oxide concentration (parts per 10 million).
+# RM: Average number of rooms per dwelling.
+# AGE: Proportion of owner-occupied units built before 1940.
+# DIS: Weighted distance to employment centers in Boston.
+# RAD: Accessibility index to radial highways.
+# TAX: Property tax rate (per $10,000).
+# PTRATIO: Pupil-teacher ratio by town.
+# B: 1000(Bk - 0.63)^2, where Bk is the proportion of residents of African American descent by town.
+# LSTAT: Percentage of lower status population.
+# MEDV: Median value of owner-occupied homes in thousands of dollars.
 
 #########################################
-# 1) Dividindo amostras de treino e teste #
+# 1) Splitting Training and Testing Data #
 #########################################
 n <- sample(1:2,
             size = nrow(BostonHousing),
             replace = TRUE,
             prob=c(0.8, 0.2))
 
-treino <- BostonHousing[n==1,]
-teste <- BostonHousing[n==2,]
+training_data <- BostonHousing[n==1,]
+testing_data <- BostonHousing[n==2,]
 
 #########################################
-# 2) Treinando a Random Forest            #
+# 2) Training the Random Forest         #
 #########################################
-floresta <- randomForest::randomForest(
+forest <- randomForest::randomForest(
   medv ~ .,
-  data = treino,
+  data = training_data,
   ntree = 500
 )
 
-predict(floresta, treino) %>% head
-predict(floresta, teste) %>% head
+predict(forest, training_data) %>% head
+predict(forest, testing_data) %>% head
 
 #########################################
-# 3) Avaliando o modelo                 #
+# 3) Model Evaluation                   #
 #########################################
 
-# Base de treino
-p_treino <- predict(floresta, treino) 
+# Training dataset
+p_train <- predict(forest, training_data) 
   
-# Base de teste
-p_teste <- predict(floresta, teste)
+# Testing dataset
+p_test <- predict(forest, testing_data)
   
-# Data frame de avaliação (Treino)
-aval_treino <- data.frame(obs=treino$medv, 
-                          pred=p_treino )
+# Evaluation data frame (Training)
+eval_train <- data.frame(obs=training_data$medv, 
+                          pred=p_train )
 
-# Data frame de avaliação (Teste)
-aval_teste <- data.frame(obs=teste$medv, 
-                          pred=p_teste)
+# Evaluation data frame (Testing)
+eval_test <- data.frame(obs=testing_data$medv, 
+                          pred=p_test)
   
-# Função de avaliação
-avalia <- function(pred, obs) {
+# Evaluation function
+evaluate <- function(pred, obs) {
   mse <- mean((pred - obs)^2)
   rmse <- sqrt(mse)
   mae <- mean(abs(pred - obs))
@@ -86,61 +88,62 @@ avalia <- function(pred, obs) {
   cat("MSE:", mse, "\n")
   cat("RMSE:", rmse, "\n")
   cat("MAE:", mae, "\n")
-  cat("R-squared:", r_squared, "\n")}
+  cat("R-squared:", r_squared, "\n")
+}
   
-# Usando a função de avaliação
-avalia(p_treino, treino$medv)
-avalia(p_teste, teste$medv)
+# Using the evaluation function
+evaluate(p_train, training_data$medv)
+evaluate(p_test, testing_data$medv)
 
 ##############################################
-# 4) Usando o Caret para fazer o grid-search #
+# 4) Using Caret for Grid Search            #
 ##############################################
   
-# Validação Cruzada
-controle <- caret::trainControl(
+# Cross-Validation
+control <- caret::trainControl(
   method = 'repeatedcv', 
   number = 4,
   repeats = 2,
   search = 'grid',
   summaryFunction = defaultSummary, 
-  classProbs = FALSE )
+  classProbs = FALSE 
+)
   
 grid <- base::expand.grid(.mtry = 1:10)
   
-# Modelando a floresta com a validação cruzada
-floresta_grid <- caret::train(medv ~ .,  
-                                data = treino,
+# Modeling the forest with cross-validation
+forest_grid <- caret::train(medv ~ .,  
+                                data = training_data,
                                 method = 'rf', 
                                 metric = 'RMSE', # Choose the best model based on RMSE
-                                trControl = controle,
+                                trControl = control,
                                 ntree = 500,
                                 tuneGrid = grid)
   
-print(floresta_grid)
-plot(floresta_grid)
+print(forest_grid)
+plot(forest_grid)
   
 ##############################################
-# Avaliando o modelo tunado                  #
+# Evaluating the Tuned Model                 #
 ##############################################
-p_treino_grid <- predict(floresta_grid, treino)
-p_teste_grid <- predict(floresta_grid, teste)
+p_train_grid <- predict(forest_grid, training_data)
+p_test_grid <- predict(forest_grid, testing_data)
 
-avalia(p_treino_grid, treino$medv)
-avalia(p_teste_grid, teste$medv)
+evaluate(p_train_grid, training_data$medv)
+evaluate(p_test_grid, testing_data$medv)
 
-avalia(p_treino, treino$medv)
-avalia(p_teste, teste$medv)
+evaluate(p_train, training_data$medv)
+evaluate(p_test, testing_data$medv)
 
-aval_treino_grid <- data.frame(obs=treino$medv, 
-                          pred=p_treino_grid )
+eval_train_grid <- data.frame(obs=training_data$medv, 
+                          pred=p_train_grid )
 
-aval_teste_grid <- data.frame(obs=teste$medv, 
-                         pred=p_teste_grid)
+eval_test_grid <- data.frame(obs=testing_data$medv, 
+                         pred=p_test_grid)
 
 ##############################################
-# Conclusão                                  #
+# Conclusion                                 #
 ##############################################
 
-## Podemos concluir que a floresta "tunada" por grid-search e validação cruzada obteve uma 
-## leve melhora na sua acurácia preditiva.
-  
+## We can conclude that the grid-search and cross-validated tuned forest 
+## achieved a slight improvement in its predictive accuracy.
