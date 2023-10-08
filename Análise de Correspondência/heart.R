@@ -1,196 +1,197 @@
-## No mundo contemporâneo, em que doenças cardiovasculares têm se tornado uma preocupação global,
-## a capacidade de identificar os fatores que contribuem para o desenvolvimento de problemas cardíacos 
-## é fundamental. Compreender os aspectos e as características pessoais que desempenham um papel 
-## crucial nessa condição nos permite desenvolver estratégias preventivas mais eficazes e personalizadas.
+## In the contemporary world, where cardiovascular diseases have become a global concern,
+## the ability to identify factors contributing to the development of heart problems
+## is fundamental. Understanding the aspects and personal characteristics that play a role
+## in this condition allows us to develop more effective and personalized preventive strategies.
 
-## A análise de correspondência é uma técnica poderosa que permite identificar padrões e 
-## associações entre variáveis categóricas. Com base nessa metodologia, iremos investigar uma 
-## ampla gama de fatores, como idade, sexo e diagnósticos médicos. Através dessa abordagem, 
-## obteremos insights significativos para uma compreensão mais abrangente das características 
-## e perfis das pessoas afetadas por problemas cardíacos.
+## Correspondence analysis is a powerful technique that allows us to identify patterns and
+## associations between categorical variables. Based on this methodology, we will investigate
+## a wide range of factors, such as age, gender, and medical diagnoses. Through this approach,
+## we will gain meaningful insights for a more comprehensive understanding of the characteristics
+## and profiles of people affected by heart problems.
 
+# Installation and loading of the required packages
+packages <- c("plotly", "tidyverse", "ggrepel", "knitr", "kableExtra", "sjPlot", "FactoMineR", "amap", "ade4", "readxl")
 
-# Instalação e carregamento dos pacotes utilizados
-pacotes <- c("plotly", "tidyverse", "ggrepel", "knitr", "kableExtra", "sjPlot", "FactoMineR", "amap", "ade4","readxl")
-
-if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
-  instalador <- pacotes[!pacotes %in% installed.packages()]
-  for(i in 1:length(instalador)) {
-    install.packages(instalador, dependencies = T)
-    break()}
-  sapply(pacotes, require, character = T) 
+if (sum(as.numeric(!packages %in% installed.packages())) != 0) {
+  installer <- packages[!packages %in% installed.packages()]
+  for (i in 1:length(installer)) {
+    install.packages(installer, dependencies = TRUE)
+    break()
+  }
+  sapply(packages, require, character = TRUE)
 } else {
-  sapply(pacotes, require, character = T) 
+  sapply(packages, require, character = TRUE)
 }
 
-# Importando a base de dados
-dados_cor <- read_excel("dados_cor_acm.xlsx")
+# Importing the dataset
+heart_data <- read_excel("heart_data_acm.xlsx")
 
-## Ao analisarmos o banco de dados, podemos ver que algumas das variáveis são quantitativas, enquanto
-## outras são qualitativas. Como a análise de correpondência é uma técnica exclusiva para variáveis
-## qualitativas, precisamos transformar algumas das variáveis. Poderíamos simplesmente excluir as variáveis
-## quantitativas, mas para evitarmos a perca de informação dessas variáveis, seguiremos com a transformação.
+## When analyzing the database, we can see that some variables are quantitative, while
+## others are qualitative. Since correspondence analysis is a technique exclusive to
+## qualitative variables, we need to transform some of the variables. We could simply
+## exclude the quantitative variables, but to avoid losing information from these variables,
+## we will proceed with the transformation.
 
-# Vamos categorizar as variáveis quanti (por critério estatístico)
-dados_cor <- dados_cor %>% 
-  mutate(Categ_Idade = case_when(Idade <= quantile(Idade, 0.25, na.rm = T) ~ "menores_idades",
-                                 Idade > quantile(Idade, 0.25, na.rm = T) & Idade <= quantile(Idade, 0.75, na.rm = T) ~ "idades_médias",
-                                 Idade > quantile(Idade, 0.75, na.rm = T) ~ "maiores_idades"))
+# Let's categorize the quantitative variables (by statistical criteria)
+heart_data <- heart_data %>% 
+  mutate(Age_Category = case_when(Age <= quantile(Age, 0.25, na.rm = TRUE) ~ "young_age",
+                                  Age > quantile(Age, 0.25, na.rm = TRUE) & Age <= quantile(Age, 0.75, na.rm = TRUE) ~ "middle_age",
+                                  Age > quantile(Age, 0.75, na.rm = TRUE) ~ "old_age"))
 
-dados_cor <- dados_cor %>% 
-  mutate(Categ_PS_Desc = case_when(PS_Descanso <= quantile(PS_Descanso, 0.25, na.rm = T) ~ "PS_descanso_baixo",
-                                   PS_Descanso > quantile(PS_Descanso, 0.25, na.rm = T) & PS_Descanso <= quantile(PS_Descanso, 0.75, na.rm = T) ~ "PS_descanso_médio",
-                                   PS_Descanso > quantile(PS_Descanso, 0.75, na.rm = T) ~ "PS_descanso_alto"))
+heart_data <- heart_data %>% 
+  mutate(Resting_BP_Category = case_when(Resting_BP <= quantile(Resting_BP, 0.25, na.rm = TRUE) ~ "low_resting_BP",
+                                         Resting_BP > quantile(Resting_BP, 0.25, na.rm = TRUE) & Resting_BP <= quantile(Resting_BP, 0.75, na.rm = TRUE) ~ "medium_resting_BP",
+                                         Resting_BP > quantile(Resting_BP, 0.75, na.rm = TRUE) ~ "high_resting_BP"))
 
-dados_cor <- dados_cor %>% 
-  mutate(Categ_Colest = case_when(Colesterol <= quantile(Colesterol, 0.25, na.rm = T) ~ "menor_colesterol",
-                                  Colesterol > quantile(Colesterol, 0.25, na.rm = T) & Colesterol <= quantile(Colesterol, 0.75, na.rm = T) ~ "colesterol_médio",
-                                  Colesterol > quantile(Colesterol, 0.75, na.rm = T) ~ "maior_colesterol"))
+heart_data <- heart_data %>% 
+  mutate(Cholesterol_Category = case_when(Cholesterol <= quantile(Cholesterol, 0.25, na.rm = TRUE) ~ "low_cholesterol",
+                                          Cholesterol > quantile(Cholesterol, 0.25, na.rm = TRUE) & Cholesterol <= quantile(Cholesterol, 0.75, na.rm = TRUE) ~ "medium_cholesterol",
+                                          Cholesterol > quantile(Cholesterol, 0.75, na.rm = TRUE) ~ "high_cholesterol"))
 
-dados_cor <- dados_cor %>% 
-  mutate(Categ_BC_Max = case_when(BC_Max <= quantile(BC_Max, 0.25, na.rm = T) ~ "menor_BC_Max",
-                                  BC_Max > quantile(BC_Max, 0.25, na.rm = T) & BC_Max <= quantile(BC_Max, 0.75, na.rm = T) ~ "BC_Max_médio",
-                                  BC_Max > quantile(BC_Max, 0.75, na.rm = T) ~ "maior_BC_Max"))
+heart_data <- heart_data %>% 
+  mutate(Max_HeartRate_Category = case_when(Max_HeartRate <= quantile(Max_HeartRate, 0.25, na.rm = TRUE) ~ "low_Max_HeartRate",
+                                            Max_HeartRate > quantile(Max_HeartRate, 0.25, na.rm = TRUE) & Max_HeartRate <= quantile(Max_HeartRate, 0.75, na.rm = TRUE) ~ "medium_Max_HeartRate",
+                                            Max_HeartRate > quantile(Max_HeartRate, 0.75, na.rm = TRUE) ~ "high_Max_HeartRate"))
 
-## Com as variáveis devidamente transformadas, podemos agora eliminar as variáveis quantitativas
-## sem perder a informação contida nas mesmas.
+## With the variables properly transformed, we can now remove the quantitative variables
+## without losing the information contained in them.
 
-# Vamos remover as variáveis que não utilizaremos (quantitativas)
-dados_cor <- dados_cor %>% 
-  select(-Idade, -PS_Descanso, -Colesterol, -BC_Max)
+# Let's remove the variables we won't use (quantitative)
+heart_data <- heart_data %>% 
+  select(-Age, -Resting_BP, -Cholesterol, -Max_HeartRate)
 
-# Conferindo o tipo das variáveis
-str(dados_cor)
+# Checking the data types
+str(heart_data)
 
-## Vamos mudar nossas variáveis de caracther para fatores, pois a função `dudi.acm` que usaremos so aceita
-## inputs desse tipo.
+## Let's change our character variables to factors, as the `dudi.acm` function we will use
+## only accepts inputs of this type.
 
-# A função para a criação da ACM pede que sejam utilizados "fatores"
-dados_cor <- as.data.frame(unclass(dados_cor), stringsAsFactors=TRUE) 
+# The function for creating the ACM requires "factors"
+heart_data <- as.data.frame(unclass(heart_data), stringsAsFactors = TRUE)
 
-## Pra que uma análise de correpondência seja realizada, precisamos que as variáveis do banco de dados
-## tenham associação com pelo menos uma outra variável presente no banco de dados. Como no contexto
-## da nossa análise a presença, ou a não presença, de doença cardíaca é o aspecto mais relevante,
-## vamos verificar se as outras variáveis possuem relação com essa última.
+## For correspondence analysis to be performed, we need the variables in the database to be
+## associated with at least one other variable present in the database. Since, in the context
+## of our analysis, the presence or absence of heart disease is the most relevant aspect,
+## let's check if the other variables are related to this last one.
 
-# Tabelas de contingência (todas apresentam associação com alguma variável?)
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Sexo,
+# Contingency tables (do all variables show an association with each other?)
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Gender,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE, 
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Tipo_Dor_Peito,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Chest_Pain_Type,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE, 
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Açucar_Sangue,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Blood_Sugar,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE,
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$ECG_Descanso,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Resting_ECG,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE,
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Angina_Exerc,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Exercise_Angina,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE,
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Categ_Idade,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Age_Category,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE,
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Categ_PS_Desc,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Resting_BP_Category,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE,
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Categ_Colest,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Cholesterol_Category,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE, 
          encoding = "UTF-8")
 
-sjt.xtab(var.row = dados_cor$Doença_Card,
-         var.col = dados_cor$Categ_BC_Max,
+sjt.xtab(var.row = heart_data$Heart_Disease,
+         var.col = heart_data$Max_HeartRate_Category,
          show.exp = TRUE,
          show.row.prc = TRUE,
          show.col.prc = TRUE, 
          encoding = "UTF-8")
 
-## Todas as nossas variáveis possuem um valor-p  menor que 0,05. Isso indica que, para um nível de 
-## confiança de 95%, todas as nossas variáveis possuem associação com pelo menos uma outra variável
-## presente no banco de dados. Logo, podemos saeguir com a nossa análise.
+## All our variables have a p-value less than 0.05. This indicates that, at a confidence level of 95%,
+## all our variables are associated with at least one other variable present in the database. Therefore,
+## we can proceed with our analysis.
 
-# Aplicando a análise de correpondência através da função `dudi.acm`
-ACM <- dudi.acm(dados_cor, scannf = FALSE, nf = 3)
+# Applying correspondence analysis using the `dudi.acm` function
+ACM <- dudi.acm(heart_data, scannf = FALSE, nf = 3)
 
-## Como possuímos vários pares de variáveis, foi preciso usar uma função que execute uma análise 
-## de correspondência múltipla (ACM). A ACM consiste em análises de correspondência simples (ACS) 
-## que são realizadas entre todos os pares de variáveis. Após finalizar as ACS para todos os pares, 
-## os autovalores são extraídos e podem ser usados, entre outras coisas, para obter as proporções 
-## de inércia explicadas pelas dimensões. Ao final, teremos coordenadas que poderemos usar para 
-## plotar um mapa perceptual que demonstra a associação entre as variáveis.
+## Since we have multiple pairs of variables, we needed to use a function that performs a
+## multiple correspondence analysis (MCA). MCA consists of simple correspondence analyses (SCA)
+## that are conducted between all pairs of variables. After completing the SCAs for all pairs,
+## the eigenvalues are extracted and can be used, among other things, to obtain the proportions
+## of inertia explained by the dimensions. In the end, we will have coordinates that we can use
+## to plot a perceptual map that demonstrates the association between the variables.
 
-# Analisando as variâncias de cada dimensão
-perc_variancia <- (ACM$eig / sum(ACM$eig)) * 100
-paste0(round(perc_variancia,2),"%")
-## O número de dimensões é proporcional ao número de variáveis e de categorias. Para o nosso caso
-## temos um total de 17 dimensões. Uma fórmula simples para sabermos o total de dimensões em nas ACMs
-## é subtrair o total de categorias pelo total de variáveis. Sabemos que temos 10 variáveis no total,
-## vamos conferir se realmente temos 27 categorias.
+# Analyzing the variances of each dimension
+variance_percent <- (ACM$eig / sum(ACM$eig)) * 100
+paste0(round(variance_percent, 2), "%")
+## The number of dimensions is proportional to the number of variables and categories. For our case,
+## we have a total of 17 dimensions. A simple formula to know the total dimensions in ACAs is to subtract
+## the total categories from the total variables. We know we have 10 variables in total; let's check if
+## we indeed have 27 categories.
 
-# Quantidade de categorias por variável
-quant_categorias <- apply(dados_cor,
-                          MARGIN =  2,
-                          FUN = function(x) nlevels(as.factor(x)))
-quant_categorias
-## Podemos ver que realmente nossas variáveis possuem um total de 27 categorias.
+# Number of categories per variable
+num_categories <- apply(heart_data,
+                        MARGIN =  2,
+                        FUN = function(x) nlevels(as.factor(x)))
+num_categories
+## We can see that indeed our variables have a total of 27 categories.
 
-# Consolidando as coordenadas-padrão obtidas por meio da matriz binária
-df_ACM <- data.frame(ACM$c1, Variável = rep(names(quant_categorias),
-                                            quant_categorias))
+# Consolidating the standard coordinates obtained from the binary matrix
+df_ACM <- data.frame(ACM$c1, Variable = rep(names(num_categories),
+                                            num_categories))
 
-## Vamos usar as coordenadas obtidas para plotar alguns gráfico que permitam a visualização facilitada
-## das associações entre as variáveis.
+## We will use the obtained coordinates to plot some graphs that allow for easy visualization
+## of associations between the variables.
 
-# Plotando o mapa perceptual 2D
+# Plotting the 2D perceptual map
 df_ACM %>%
   rownames_to_column() %>%
-  rename(Categoria = 1) %>%
-  ggplot(aes(x = CS1, y = CS2, label = Categoria, color = Variável)) +
+  rename(Category = 1) %>%
+  ggplot(aes(x = CS1, y = CS2, label = Category, color = Variable)) +
   geom_point() +
   geom_label_repel() +
   geom_vline(aes(xintercept = 0), linetype = "longdash", color = "grey48") +
   geom_hline(aes(yintercept = 0), linetype = "longdash", color = "grey48") +
-  labs(x = paste("Dimensão 1:", paste0(round(perc_variancia[1], 2), "%")),
-       y = paste("Dimensão 2:", paste0(round(perc_variancia[2], 2), "%"))) +
+  labs(x = paste("Dimension 1:", paste0(round(variance_percent[1], 2), "%")),
+       y = paste("Dimension 2:", paste0(round(variance_percent[2], 2), "%"))) +
   theme_bw()
 
-# Mapa perceptual em 3D (3 primeiras dimensões)
+# 3D perceptual map (first 3 dimensions)
 ACM_3D <- plot_ly()
 
-# Adicionando as coordenadas
-ACM_3D <- add_trace(p = ACM_3D,
+# Adding coordinates
+ACM_3D <- add_trace(ACM_3D,
                     x = df_ACM$CS1,
                     y = df_ACM$CS2,
                     z = df_ACM$CS3,
@@ -202,35 +203,41 @@ ACM_3D <- add_trace(p = ACM_3D,
 
 ACM_3D
 
-## O grande número de variáveis torna o gráfico 3D difícil de interpretar, mas em análises com um número
-## menor de variáveis o gráfico 3D pode ser uma ferramenta de análise tão útil, ou até mais útil, quanto o bidimensional.
+## The large number of variables makes the 3D graph difficult to interpret, but in analyses with a
+## smaller number of variables, the 3D graph can be an equally useful, or even more useful, analysis
+## tool than the two-dimensional one.
 
-# É possível obter as coordenadas das observações
-df_coord_obs <- ACM$li
+# It is possible to obtain coordinates of the observations
+df_obs_coords <- ACM$li
 
-# Plotando o mapa perceptual das observações
-df_coord_obs %>%
-  ggplot(aes(x = Axis1, y = Axis2, color = dados_cor$Doença_Card)) +
+# Plotting the perceptual map of observations
+df_obs_coords %>%
+  ggplot(aes(x = Axis1, y = Axis2, color = heart_data$Heart_Disease)) +
   geom_point() +
   geom_vline(aes(xintercept = 0), linetype = "longdash", color = "grey48") +
   geom_hline(aes(yintercept = 0), linetype = "longdash", color = "grey48") +
-  labs(x = paste("Dimensão 1:", paste0(round(perc_variancia[1], 2), "%")),
-       y = paste("Dimensão 2:", paste0(round(perc_variancia[2], 2), "%")),
-       color = "Doença Cardíaca") +
+  labs(x = paste("Dimension 1:", paste0(round(variance_percent[1], 2), "%")),
+       y = paste("Dimension 2:", paste0(round(variance_percent[2], 2), "%")),
+       color = "Heart Disease") +
   theme_bw()
 
+## We can conclude that correspondence analysis allows us to condense categorical (qualitative) variables
+## into quantitative variables that can be used to plot graphs for a better visualization of the
+## relationship between these variables. This transformation allows us to explore and interpret patterns
+## of association between categories more efficiently.
 
-## Podemos concluir que a análise de correspondência nos permite condensar variáveis categóricas 
-## (qualitativas) em variáveis quantitativas, que podem ser utilizadas na plotagem de gráficos 
-## para uma melhor visualização da relação entre essas variáveis. Essa transformação permite que
-## exploremos e interpretemos os padrões de associação entre as categorias de forma mais eficiente.
+## In addition, the quantitative variables obtained through correspondence analysis can be used in other
+## data analysis techniques. For example, these variables can be used in factor analyses to identify
+## underlying structures in the data or in clustering to group similar observations. They can also be
+## used in supervised predictive models, where they can be employed as predictors in statistical or
+## machine learning models. This allows us to explore the relationship between the transformed categorical
+## variables and an outcome variable, such as a response variable.
 
-## Além disso, as variáveis quantitativas obtidas por meio da análise de correspondência podem ser 
-## utilizadas em outras técnicas de análise de dados. Por exemplo, essas variáveis podem ser empregadas 
-## em análises fatoriais para identificar estruturas subjacentes nos dados ou em clusterizações para 
-## agrupar observações semelhantes. Também é possível utilizar essas variáveis em modelos supervisionados 
-## preditivos, onde podem ser empregadas como preditores em modelos estatísticos ou de aprendizado 
-## de máquina. Isso permite explorar a relação entre as variáveis categóricas transformadas em quantitativas 
+## Therefore, correspondence analysis provides us with an effective way to explore and visualize the
+## relationship between categorical variables, and the quantitative variables derived from this analysis
+## can be applied in various data analysis techniques, expanding the potential for insights and discoveries
+## in exploratory and predictive studies.
+
 ## e uma variável de interesse, como uma variável de resposta. 
 
 ## Portanto, a análise de correspondência nos proporciona uma maneira eficaz de explorar e visualizar 
