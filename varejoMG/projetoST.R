@@ -1,168 +1,158 @@
-# Instalação e Carregamento de Todos os Pacotes ---------------------------
+# Installation and Loading of All Packages ---------------------------
 
-pacotes <- c("readr","readxl","plotly","trend","tidyverse","gridExtra","forecast","TTR",
-             "smooth", "tsibble", "fable","tsibbledata", "fpp3","lubridate",
-             "urca", "dygraphs", "quantmod","BETS","tseries","FinTS","feasts",
-             "gridExtra", "scales", "caret","xtable", "tsutils","GetBCBData", 
-             "quantmod","dgof","seasonal","devtools","transformr","gganimate","rugarch")
+packages <- c("readr", "readxl", "plotly", "trend", "tidyverse", "gridExtra", "forecast", "TTR",
+             "smooth", "tsibble", "fable", "tsibbledata", "fpp3", "lubridate",
+             "urca", "dygraphs", "quantmod", "BETS", "tseries", "FinTS", "feasts",
+             "gridExtra", "scales", "caret", "xtable", "tsutils", "GetBCBData", 
+             "quantmod", "dgof", "seasonal", "devtools", "transformr", "gganimate", "rugarch")
 
-if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
-  instalador <- pacotes[!pacotes %in% installed.packages()]
-  for(i in 1:length(instalador)) {
-    install.packages(instalador, dependencies = T)
-    break()}
-  sapply(pacotes, require, character = T)
+if (sum(as.numeric(!packages %in% installed.packages())) != 0) {
+  installer <- packages[!packages %in% installed.packages()]
+  for (i in 1:length(installer)) {
+    install.packages(installer, dependencies = TRUE)
+    break()
+  }
+  sapply(packages, require, character = TRUE)
 } else {
-  sapply(pacotes, require, character = T)
+  sapply(packages, require, character = TRUE)
 }
 
-# O objetivo deste trabalho é prever as futuras alterações no indice do volume de
-# vendas no varejo do estado de Minas Gerais. Vamos utilizar o indice do IBGE como
-# série temporal, e estimaremos um modelo ARIMA com ajuste de volatilidade condicional(GARCH)
-# nas previsões e um modelo ETS. No final iremos comparar e analisar as previsões de ambos.
+# The objective of this work is to predict future changes in the retail sales volume index
+# for the state of Minas Gerais. We will use the IBGE index as a time series and estimate
+# an ARIMA model with conditional volatility adjustment (GARCH) in the forecasts and an ETS model.
+# In the end, we will compare and analyze the forecasts of both.
 
-
-#varejo Minas Gerais
-varejoMG=gbcbd_get_series(1472,first.date='2000-01-01')
-TSvarejoMG=ts(varejoMG[2], start = c(2000,1), end = c(2022,12), frequency = 12)
+# Retail sales in Minas Gerais
+varejoMG <- gbcbd_get_series(1472, first.date = '2000-01-01')
+TSvarejoMG <- ts(varejoMG[2], start = c(2000, 1), end = c(2022, 12), frequency = 12)
 dygraph(TSvarejoMG)
 
-# Decompor a série temporal
-decomposicao <- decompose(TSvarejoMG)
+# Decompose the time series
+decomposition <- decompose(TSvarejoMG)
 
-# Visualizar os componentes
-plot(decomposicao)
-# podemos ver claramente que existe tendencia e sazonalidade na serie
+# Visualize the components
+plot(decomposition)
+# We can clearly see that there is a trend and seasonality in the series
 
-# apesar da clara tendencia, vamos confirmar com o teste de Mann-Kendall
+# Despite the clear trend, let's confirm with the Mann-Kendall test
 install.packages("trend")
 library(trend)
 result <- Kendall(x = seq_along(TSvarejoMG), y = TSvarejoMG)
 result
 
-# Como o valor estimado para tau é 0.778, e o valor p bilateral é menor ou igual a 2.22e-16, 
-# temos indicação de uma tendência na série temporal.
+# Since the estimated value for tau is 0.778, and the bilateral p-value is less than or equal to 2.22e-16,
+# we have an indication of a trend in the time series.
 
-#divisão de janelas, sendo uma para treinarmos o algoritmo, e a outra para verificarmos sua eficiencia
+# Window division, one for training the algorithm, and the other for verifying its efficiency
 
-#Minas Gerais
-TSvarejotreinoMG=window(TSvarejoMG, start=c(2000,1), end=c(2020,12))
-TSvarejotesteMG=window(TSvarejoMG,start=c(2021,1), end=c(2022,12))
+# Minas Gerais
+TSvarejotreinoMG <- window(TSvarejoMG, start = c(2000, 1), end = c(2020, 12))
+TSvarejotesteMG <- window(TSvarejoMG, start = c(2021, 1), end = c(2022, 12))
 length(TSvarejotesteMG)
 
-#plotando as duas séries juntas para checagem
+# Plotting both series together for checking
 
-#Minas Gerais
+# Minas Gerais
 autoplot(TSvarejoMG) +
-  autolayer(TSvarejotreinoMG, series="Treino") +
-  autolayer(TSvarejotesteMG, series="Teste") +
+  autolayer(TSvarejotreinoMG, series = "Training") +
+  autolayer(TSvarejotesteMG, series = "Test") +
   scale_color_viridis_d() +
   theme_bw()
 
-
-
-## Análise das Séries
+## Series Analysis
 
 ggtsdisplay(TSvarejotreinoMG)
 
+# Since we detected the possible presence of trend and seasonality, we are likely dealing
+# with a non-stationary series. Let's confirm it.
 
-# como detectamos a possível presença de tendencia e sazonalidade, provavelmente estamos lidando
-# com uma serie não estacionária. Vamos confirmar.
+# Stationarity Test
 
-# Teste de Estacionariedade
-
-#Minas Gerais
-testevarejoMG=ur.df(TSvarejotreinoMG)
+# Minas Gerais
+testevarejoMG <- ur.df(TSvarejotreinoMG)
 summary(testevarejoMG)
 
-# A série não é estacionária - precisa ser diferenciada ou transformada para 
-# aplicarmos um modelo ARIMA nela. O processo de diferenciação é uma técnica comumente 
-# utilizada para transformar séries temporais não estacionárias em séries temporais estacionárias. 
-# A ideia básica por trás da diferenciação é calcular a diferença entre observações consecutivas da série.
+# The series is not stationary - it needs to be differenced or transformed to apply an ARIMA model to it.
+# The differencing process is commonly used to transform non-stationary time series into stationary ones.
+# The basic idea behind differencing is to calculate the difference between consecutive observations of the series.
 
-#vamos ver quantas diferenciações são necessárias
+# Let's see how many differences are necessary
 
 ndiffs(TSvarejotreinoMG)
 
-# 1 diferenciação é necessária para estacionar a série
+# 1 difference is necessary to make the series stationary
 
+# Now that we have performed a brief analysis of the series, we can proceed with modeling.
+# Generally, ARIMA models are suitable for series with trend and seasonality.
+# They are capable of capturing such patterns through autoregressive (AR), moving average (MA), and differencing (I) components.
 
-# Agora que realizamos uma breve análise da série, podemos prosseguir com a modelagem. Geralmente,
-# os modelos ARIMA são indicados para séries com presença de tendencia e sazonalidade.
-# Eles são capazes de capturar tais padrões por meio de componentes autoregressivos (AR), 
-# de média móvel (MA) e de diferenciação (I).
+# In addition to ARIMA, ETS models are also capable of handling this type of series.
+# They are based on exponential smoothing techniques and are useful when the series patterns are
+# additive (A) or multiplicative (M), and can include additional components to capture seasonality,
+# such as seasonal exponential smoothing (S).
 
-# Além do ARIMA, os modelos ETS também são capazes de lidar com esse tipo de série.Eles 
-# são baseados em técnicas de suavização exponencial e são úteis quando os padrões da série são 
-# aditivos (A) ou multiplicativos (M), e podem incluir componentes adicionais para capturar a 
-# sazonalidade, como a suavização exponencial sazonal (S).
+# Therefore, as we are dealing with such a series, we will use R to estimate an ARIMA model for our series.
+# Then, we will estimate an ETS model and compare the predictive ability of both.
 
-# Assim sendo, como estamos diante de uma serie com tais caracteristicas, vamos usar o R
-# para estimar um modelo ARIMA a para nossa serie.Depois, estimaremos um modelo ETS e compararemos
-# a capacidade preditiva dos dois.
+# Estimating ARIMA models
 
-#Estimando modelos arima
-
-#Vamos usar nossa série temporal de treino "TSvarejotreinoMG" para estimar o modelo
-arimavarejoMG=auto.arima(TSvarejotreinoMG, trace=T)
+# Let's use our training time series "TSvarejotreinoMG" to estimate the model
+arimavarejoMG <- auto.arima(TSvarejotreinoMG, trace = TRUE)
 
 summary(arimavarejoMG)
 
-# Podemos ver que o R nos estimou corretamente um modelo ARIMA sazonal(sARIMA) de 12 períodos.
-# Resta agora saber se os parametros estimados; 4 termos autorregressivos(AR), 1 difenrenciação não sazonal(I) e 1 termo de média móvel(MA) não sazonal, além
-# de 1 diferenciação sazonal e 2 termos de média movel sazonal; serão capazes de fazer
-# previsões precisas. Percebe-se que o R realizou a diferenciação que comentamos um pouco acima.
+# We can see that R has correctly estimated a seasonal ARIMA (sARIMA) model with a 12-period seasonality.
+# Now we need to determine if the estimated parameters, which include 4 autoregressive terms (AR), 1 non-seasonal differencing (I),
+# 1 non-seasonal moving average term (MA), as well as 1 seasonal differencing and 2 seasonal moving average terms, will be able to make accurate forecasts.
+# It is noted that R has already performed the differencing we mentioned earlier.
 
-#### validação e diagnóstico
+#### Validation and Diagnosis
 
-# 1. Teste de Ljung-Box
+# 1. Ljung-Box Test
 
-# Iremos usar o teste de Ljung-Box para testar a autocorrelação dos resíduos. E desejável que
-# os resíduos dos modelos preditivos de series temporais não apresentem autocorrelaçao. Quando os resíduos 
-# apresentam autocorrelação, significa que as observações subsequentes estão relacionadas entre si e 
-# que a estrutura temporal dos dados não foi adequadamente capturada pelo modelo. 
-# Isso pode levar a previsões imprecisas e ineficientes, bem como a interpretações errôneas dos resultados.
+# We will use the Ljung-Box test to test the autocorrelation of the residuals. It is desirable that
+# the residuals of time series predictive models do not exhibit autocorrelation. When residuals
+# exhibit autocorrelation, it means that subsequent observations are related to each other and
+# that the temporal structure of the data has not been adequately captured by the model.
+# This can lead to inaccurate and inefficient forecasts, as well as misinterpretations of results.
 
 checkresiduals(arimavarejoMG)
 
-# Basicamente, quanto mais próximo de 1 forem os valores p no teste de Ljung-Box, menor é
-# a chance de autocorrelação entre os resíduos de um modelo desse tipo. Nesse tangente,
-# podemos dizer que o nosso modelo parece ser razoável. Entretanto, isso não indica que o modelo seja ruim.
-# É importante lembrar que a avaliação da qualidade de uma série temporal não se baseia apenas 
-# na ausência de correlação nos resíduos. Outros critérios, como o contexto da serie temporal, 
-# a estacionariedade dos dados, a precisão das previsões e a normalidade dos resíduos,
-# também devem ser considerados. Vamos fazer mais alguns testes para melhor avaliar o modelo. 
+# Basically, the closer the p-values in the Ljung-Box test are to 1, the lower the chance of autocorrelation
+# among the residuals of a model like this. In this regard, we can say that our model seems reasonable.
+# However, this does not mean that the model is bad. It is important to remember that the assessment of the quality
+# of a time series is not based solely on the absence of correlation in the residuals. Other criteria, such as
+# the context of the time series, data stationarity, forecast accuracy, and residual normality, should also be considered.
+# Let's perform some more tests to better evaluate the model.
 
-# 2. Normalidade dos resíduos
+# 2. Normality of Residuals
 
-# Vamos usar o teste de Kolmogorov-Smirnov através da função ks.test para verificarmos
-# se os resíduos dos nossos modelos seguem uma distribuição normal. O teste de Kolmogorov-Smirnov,
-# é um teste de aderência usado para comparar uma distribuição teórica com uma amostra de dados,
-# e será usado no nosso caso para verificar a normalidade dos resíduos. Espera-se que os resíduos
-# sigam uma distribuição normal, pois um modelo com resíduos aderentes à normalidade tendem a indicar
-# que o modelo é capaz de previsões mais precisas.
-
+# We will use the Kolmogorov-Smirnov test through the ks.test function to check
+# if the residuals of our models follow a normal distribution. The Kolmogorov-Smirnov test,
+# is a goodness-of-fit test used to compare a theoretical distribution with a sample of data,
+# and in our case, it will be used to check the normality of the residuals. It is expected that
+# the residuals follow a normal distribution because a model with residuals adhering to normality
+# tends to indicate that the model is capable of more accurate predictions.
 
 ks.test(arimavarejoMG$residuals, "pnorm", mean(arimavarejoMG$residuals),
         sd(arimavarejoMG$residuals))
 
-# Podemos ver que para um nível de significancia de 0.5, os resíduos do nosso modelo
-# aparentam não seguir uma distribuição normal(gaussiana)...
+# We can see that for a significance level of 0.05, the residuals of our model
+# do not appear to follow a normal (Gaussian) distribution...
 
-# Por fim, vamos testar a presença de efeitos ARCH. Os efeitos ARCH são uma forma específica 
-# de heterocedasticidade em que a variância dos erros é modelada como uma função autorregressiva 
-# dos próprios erros. Tais efeitos podem ocasionar em ineficiência na estimativa dos parâmetros, 
-# violação da suposição de homocedasticidade, dificuldade na interpretação dos resultados e 
-# possível autocorrelação residual.
+# Finally, let's test the presence of ARCH effects. ARCH effects are a specific form of heteroskedasticity
+# where the variance of errors is modeled as an autoregressive function of the errors themselves.
+# Such effects can result in parameter estimation inefficiency, violation of the homoskedasticity assumption,
+# difficulty in interpreting results, and possible residual autocorrelation.
 
 ArchTest(arimavarejoMG$residuals)
 
-# Com base nesses resultados, podemos interpretar que há evidências significativas para rejeitar 
-# a hipótese nula, sugerindo que estamos diante de um modelo com efeitos ARCH nos resíduos.
-# Apesar dos indicadores negativos, vamos testar a capacidade preditiva do modelo usando a
-# nossa série de teste "TSvarejotesteMG"
+# Based on these results, we can interpret that there is significant evidence to reject
+# the null hypothesis, suggesting that we are dealing with a model with ARCH effects in the residuals.
+# Despite the negative indicators, let's test the predictive capacity of the model using
+# our test series "TSvarejotesteMG"
 
-prevvarejo=forecast::forecast(arimavarejoMG, h=24)
+prevvarejo <- forecast::forecast(arimavarejoMG, h = 24)
 
 autoplot(prevvarejo) +
   theme_bw()
@@ -170,51 +160,50 @@ autoplot(prevvarejo) +
 forecast::accuracy(prevvarejo, TSvarejotesteMG)
 
 ggplotly(
-  autoplot(TSvarejotreinoMG)+
-    autolayer(TSvarejotesteMG,serie="Valores Reais")+
-    autolayer(prevvarejo$mean, serie="Forecast")+
-    scale_colour_viridis_d()+
-    scale_y_continuous(labels=scales::comma)+
+  autoplot(TSvarejotreinoMG) +
+    autolayer(TSvarejotesteMG, series = "Real Values") +
+    autolayer(prevvarejo$mean, series = "Forecast") +
+    scale_colour_viridis_d() +
+    scale_y_continuous(labels = scales::comma) +
     theme_bw()
 )
 
-# Curiosamente, obtivemos boas previsões. Porém, como o ArchTest indicou a possível presença
-# de heterocedasticidade condicional nos resíduos, vamos tentar implementar um modelo GARCH nos 
-# residuos do nosso modelo para obtermos a volatidade condicional dos mesmos. Depois vamos usar essa 
-# volatilidade para melhorar ainda mais nossas previsões.
+# Interestingly, we obtained good forecasts. However, since the ArchTest indicated the possible presence
+# of conditional heteroskedasticity in the residuals, let's try implementing a GARCH model on the
+# residuals of our ARIMA model to obtain conditional volatility. Then we will use this
+# volatility to further improve our forecasts.
 
-# Para tal, vamos "armazenar" os resíduos do nosso modelo em um objeto:
+# To do this, let's "store" the residuals of our model in an object:
 
-residuos_arimavarejoMG <- residuals(arimavarejoMG)
+residuals_arimavarejoMG <- residuals(arimavarejoMG)
 
-# Vamos agora criar um série temporal usando os resíduos:
+# Now let's create a time series using the residuals:
 
-TSresiduos_arimavarejoMG <- ts(residuos_arimavarejoMG, frequency = 12, start=c(2000,1), end=c(2020,12))
+TSresiduos_arimavarejoMG <- ts(residuals_arimavarejoMG, frequency = 12, start = c(2000, 1), end = c(2020, 12))
 
-# Geralmente precisariamos diferenciar a serie temporal dos residuos, pois os modelos GARCH
-# trabalham com séries de retornos, e não séries de valores absolutos. Entretando, como
-# a nossa serie temporal original já foi diferenciada, podemos seguir para a modelagem dos resíduos.
-# vamos especificcar um modelo básico GARCH(2,2)
+# Generally, we would need to difference the time series of residuals because GARCH models
+# work with return series, not absolute value series. However, as
+# our original time series has already been differenced, we can proceed to model the residuals.
+# Let's specify a basic GARCH(2,2) model:
 
 GARCH <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(2, 2)),
                     mean.model = list(armaOrder = c(0, 0)))
 
-# agora vamos fazer um modelo coms as especificações escolhidas usando a nossa série temporal
-# dos resíduos do nosso modelo arima
+# Now let's create a model with the chosen specifications using our time series
+# of the residuals of our ARIMA model
 
 GARCHresiduos_arimavarejoMG <- ugarchfit(GARCH, data = TSresiduos_arimavarejoMG)
 
-# salvando as previsões de volatilidade condicional 
+# Saving the conditional volatility forecasts
 
-volatilidade <- sigma(GARCHresiduos_arimavarejoMG)
+volatility <- sigma(GARCHresiduos_arimavarejoMG)
 
-# aplicando a volatilidade às previsões, vamos criar uma serie temporal com a 
-# volatilidade para tal
+# Applying volatility to the forecasts, let's create a time series with the
+# volatility for this purpose
 
-TSvolatilidade <- ts(volatilidade, start = start(prevvarejo$mean), frequency = frequency(prevvarejo$mean))
+TSvolatilidade <- ts(volatility, start = start(prevvarejo$mean), frequency = frequency(prevvarejo$mean))
 
 prevvarejo$mean_garch <- prevvarejo$mean * sqrt(TSvolatilidade)
-
 
 media1 <- mean(prevvarejo$mean)
 media2 <- mean(prevvarejo$mean_garch)
@@ -222,134 +211,122 @@ media3 <- media2/media1
 
 prevvarejo$mean_garch <- (prevvarejo$mean * sqrt(TSvolatilidade)) / media3
 
-## a linha 222 representa uma fórmula comumente usada para ajustar as previsões às volatilidades condicionais.
-## já o processo da linha 225 à linha 229 se faz necessário para ajustar e normalizar o impacto das volatilidades.
+## Line 222 represents a formula commonly used to adjust forecasts to conditional volatilities.
+## The process from line 225 to line 229 is necessary to adjust and normalize the impact of volatilities.
 
-# testando as previsoes usando a volatilidade garch como ajuste
+# Testing the forecasts using the GARCH-adjusted volatility
 
 autoplot(prevvarejo) +
-  autolayer(prevvarejo$mean_garch,serie="ajuste GARCH")
+  autolayer(prevvarejo$mean_garch, series = "GARCH adjustment") +
   theme_bw()
 
 forecast::accuracy(prevvarejo$mean_garch, TSvarejotesteMG)
 
 ggplotly(
-  autoplot(TSvarejotreinoMG)+
-    autolayer(TSvarejotesteMG,serie="Valores Reais")+
-    autolayer(prevvarejo$mean_garch, serie="Forecast")+
-    scale_colour_viridis_d()+
-    scale_y_continuous(labels=scales::comma)+
+  autoplot(TSvarejotreinoMG) +
+    autolayer(TSvarejotesteMG, series = "Real Values") +
+    autolayer(prevvarejo$mean_garch, series = "Forecast") +
+    scale_colour_viridis_d() +
+    scale_y_continuous(labels = scales::comma) +
     theme_bw()
 )
 
-# Como podemos ver, o modelo apresenta boa capacidade preditiva. Vamos agora tentar
-# um modelo ETS e comparar ambos os modelos.
-# Para uma maior praticidade, vamos combinar alguns comandos e comandar de uma so vez
-# que o R estime um modelo ETS e faça previsões para o mesmo
+# As we can see, the model shows good predictive ability. Now let's try an ETS model and compare both models.
+# For greater convenience, let's combine some commands and instruct R to estimate an ETS model and make predictions for it at once.
 
-ETSvarejoMG = ets(TSvarejotreinoMG)
+ETSvarejoMG <- ets(TSvarejotreinoMG)
 
-ETSprev=forecast::forecast(ETSvarejoMG, h=24)
+ETSprev <- forecast::forecast(ETSvarejoMG, h = 24)
 
 summary(ETSvarejoMG)
 
-## O "M" indica a presença de sazonalidade multiplicativa, enquanto o "Ad" indica 
-## a presença de tendência aditiva. Logo, o R estimou um modelo que é adequado para séries com 
-## uma tendência que é adicionada a uma componente sazonal multiplicativa.
+## The "M" indicates the presence of multiplicative seasonality, while "Ad" indicates
+## the presence of additive trend. Therefore, R has estimated a model suitable for series with
+## a trend added to a multiplicative seasonal component.
 
 autoplot(ETSprev) +
   theme_bw()
 
 ggplotly(
-  autoplot(TSvarejotreinoMG)+
-    autolayer(TSvarejotesteMG,serie="Valores Reais")+
-    autolayer(ETSvarejoMG$mean, serie="Previstos por ETS")+
-    scale_colour_viridis_d()+
-    scale_y_continuous(labels=scales::comma)+
+  autoplot(TSvarejotreinoMG) +
+    autolayer(TSvarejotesteMG, series = "Real Values") +
+    autolayer(ETSvarejoMG$mean, series = "Forecasted by ETS") +
+    scale_colour_viridis_d() +
+    scale_y_continuous(labels = scales::comma) +
     theme_bw()
 )
 
-## Verificando a acurácia preditiva do modelo ETS
+## Checking the predictive accuracy of the adjusted ETS model
 forecast::accuracy(ETSprev$mean, TSvarejotesteMG)
-## Podemos ver que o modelo ETS teve a melhor acurácia até agora...
+## We can see that the ETS model had better accuracy...
 
-## Ljung-Box
+## Ljung-Box Test
 
 checkresiduals(ETSvarejoMG)
 
-## Apesar da alta acurácia, e ao contrário do modelo ARIMA,o teste de Ljung Box indica fortemente 
-## a presença de autocorrelação nos resíduos. Isso não é necessariamente ruim, mas indica que o modelo 
-## pode não estar capturando toda a estrutura de dependência na série temporal.
+## Despite the high accuracy, and unlike the ARIMA model, the Ljung-Box test strongly indicates
+## the presence of autocorrelation in the residuals. This is not necessarily bad, but it suggests that the model
+## may not be capturing the entire dependence structure in the time series.
 
 ## Kolmogorov-Smirnov
 ks.test(ETSvarejoMG$residuals, "pnorm", mean(ETSvarejoMG$residuals),
         sd(ETSvarejoMG$residuals))
 
-## Diferente do modelo ARIMA, para um nível de significancia de 0.05, os resíduos do
-## modelo ETS seguem uma distribuição normal.
+## Unlike the ARIMA model, for a significance level of 0.05, the residuals of the
+## ETS model follow a normal distribution.
 
 ## Lagrange Multiplier
 ArchTest(ETSvarejoMG$residuals)
 
-## Na presença de indicação de efeitos ARCH nos resíduos de um modelo ETS, é possível explorar a 
-## possibilidade de ajustar o modelo às volatilidades condicionais, assim como foi feito no caso do 
-## modelo ARIMA. Nesse contexto, foi realizado um procedimento semelhante, onde um modelo 
-## sGARCH(0,1) foi ajustado às volatilidades condicionais. No entanto, os resultados mostraram 
-## que esses ajustes não melhoraram as previsões do modelo. Essa constatação sugere que, mesmo com 
-## a presença de efeitos ARCH, o modelo ETS funciona melhor sem o ajuste das volatilidades 
-## condicionais.
+## In the presence of indications of ARCH effects in the residuals of an ETS model, it is possible to explore the possibility of adjusting the model to conditional volatilities, as was done in the case of the ARIMA model. In this context, a similar procedure was carried out, where an sGARCH(0,1) model was adjusted to the conditional volatilities. However, the results showed that these adjustments did not improve the model's forecasts. This finding suggests that, even with the presence of ARCH effects, the ETS model works better without adjusting conditional volatilities.
 
-# Olhando a acurácia do ETS "ajustado"
+# Looking at the accuracy of the adjusted ETS
 forecast::accuracy(ETSprev$mean_garch, TSvarejotesteMG)
-#ps: valores de (p, q) diferentes de (0, 1) apresentaram resultados ainda piores...
+# P.S.: Values of (p, q) different from (0, 1) presented even worse results...
 
-# Como podemos ver, o MAPE é levemente superior ao modelo ETS inicial e indica que, 
-# diferente do nosso modelo ARIMA, o ajuste das previsões às volatilidades condicionais 
-# nesse caso não aprimorou o modelo. Por esse motivo, vamos considerar o modelo ETS incial
-# como nosso modelo ETS definitivo.
+# As we can see, the MAPE is slightly higher than the original ETS model, indicating that, unlike our ARIMA model, adjusting the forecasts to conditional volatilities in this case did not improve the model. For this reason, let's consider the original ETS model as our definitive ETS model.
 
-
-## No geral, obtivemos 3 modelos com boa capacidade preditiva, mas o modelo ETS
-## apresentou o menor MAPE, e portanto a melhor capacidade preditiva. É interessante ressaltar que,
-## apesar do ARIMA ter apresentado um melhor ajuste aos dados; pois apresentou AIC, AICc e BIC mais baixos
-## que o modelo ETS; o modelo ETS apresentou melhores previsões.
+## Overall, we obtained three models with good predictive capacity, but the ETS model
+## had the lowest MAPE, and therefore the best predictive capacity. It is worth noting that,
+## although ARIMA had a better fit to the data, as it had lower AIC, AICc, and BIC values
+## compared to the ETS model, the ETS model had better forecasts.
 
 real <- ggplotly(
-  autoplot(TSvarejotreinoMG)+
-    autolayer(TSvarejotesteMG,serie="Valores Reais")+
+  autoplot(TSvarejotreinoMG) +
+    autolayer(TSvarejotesteMG, series = "Real Values") +
     scale_color_manual(values = "yellow") +
-    scale_y_continuous(labels=scales::comma)+
+    scale_y_continuous(labels = scales::comma) +
     theme_bw()
 )
 
-previsao1 <- ggplotly(
-  autoplot(TSvarejotreinoMG)+
-    autolayer(prevvarejo$mean, serie="ARIMA")+
+forecast1 <- ggplotly(
+  autoplot(TSvarejotreinoMG) +
+    autolayer(prevvarejo$mean, series = "ARIMA") +
     scale_color_manual(values = "red") +
-    scale_y_continuous(labels=scales::comma)+
+    scale_y_continuous(labels = scales::comma) +
     theme_bw()
 )
 
-previsao2 <- ggplotly(
-  autoplot(TSvarejotreinoMG)+
-    autolayer(prevvarejo$mean_garch, serie="GARCH")+
+forecast2 <- ggplotly(
+  autoplot(TSvarejotreinoMG) +
+    autolayer(prevvarejo$mean_garch, series = "GARCH") +
     scale_color_manual(values = "blue") +
-    scale_colour_viridis_d()+
-    scale_y_continuous(labels=scales::comma)+
+    scale_colour_viridis_d() +
+    scale_y_continuous(labels = scales::comma) +
     theme_bw()
 )
 
-previsao3 <- ggplotly(
-  autoplot(TSvarejotreinoMG)+
-    autolayer(ETSvarejoMG$mean, serie="ETS")+
+forecast3 <- ggplotly(
+  autoplot(TSvarejotreinoMG) +
+    autolayer(ETSvarejoMG$mean, series = "ETS") +
     scale_color_manual(values = "green") +
-    scale_y_continuous(labels=scales::comma)+
+    scale_y_continuous(labels = scales::comma) +
     theme_bw()
 )
 
-imagem_combinada <- plotly::subplot(real, previsao1, previsao2, previsao3, nrows = 2)
+combined_plot <- plotly::subplot(real, forecast1, forecast2, forecast3, nrows = 2)
 
-imagem_combinada
+combined_plot
 
 summary(arimavarejoMG)
 summary(ETSvarejoMG)
@@ -358,27 +335,18 @@ forecast::accuracy(prevvarejo, TSvarejotesteMG)
 forecast::accuracy(prevvarejo$mean_garch, TSvarejotesteMG)
 forecast::accuracy(ETSprev, TSvarejotesteMG)
 
-## Podemos conluir que:
+## We can conclude that:
 
-## Apesar do ARIMA ser uma escolha adequada para séries com tendência e sazonalidade, 
-## isso não garante que ele sempre produzirá as melhores previsões 
-## em comparação com outros modelos, como o ETS.
+## Although ARIMA is a suitable choice for series with trend and seasonality, this does not guarantee that it will always produce the best forecasts compared to other models, such as ETS.
 
-## No nosso caso, o modelo ETS parece ter tido melhores previsões devido à sua capacidade de capturar 
-## a tendência e a sazonalidade presentes na série temporal. O modelo ARIMA, mesmo 
-## com ajuste de volatilidade condicional, pode não ter sido capaz de capturar 
-## esses padrões de forma tão eficiente.
+## In our case, the ETS model seems to have had better forecasts due to its ability to capture the trend and seasonality present in the time series. The ARIMA model, even with conditional volatility adjustment, may not have been able to capture these patterns as efficiently.
 
-## Portanto, embora o ARIMA seja uma escolha comum para séries com tendência e 
-## sazonalidade, é importante considerar outras abordagens, como o ETS, para 
-## determinar qual modelo oferece o melhor desempenho preditivo em sua série 
-## temporal específica.
+## Therefore, while ARIMA is a common choice for series with trend and seasonality, it is important to consider other approaches, such as ETS, to determine which model offers the best predictive performance for your specific time series.
 
-## Para que tenhamos convicção nas previsões, é sempre uma boa prática testar diferentes modelos
-## e compara-los a fim de obtermos o melhor modelo possível para uma determinada série.
-## Uma justificativa para o modelo com valores de AIC, AICc e BIC mais altos apresentar 
-## um MAPE mais baixo é que a série temporal em questão pode ser relativamente simples, 
-## com padrões facilmente capturados por um modelo menos complexo.
+## To have confidence in the forecasts, it is always a good practice to test different models
+## and compare them to obtain the best possible model for a given series.
+## One justification for the model with higher AIC, AICc, and BIC values to have a lower MAPE is that the time series in question may be relatively simple, with patterns easily captured by a less complex model.
+
 
 
 
