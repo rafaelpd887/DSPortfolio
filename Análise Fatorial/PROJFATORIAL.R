@@ -1,81 +1,67 @@
-# A análise fatorial por componentes principais é uma técnica estatística poderosa que nos 
-# permite reduzir a complexidade de um conjunto de dados, identificando padrões subjacentes e 
-# resumindo a informação em fatores latentes. Assim, o objetivo principal da análise fatorial 
-# por componentes principais é identificar e descrever os construtos latentes e/ou fatores que 
-# estão por trás das variáveis observadas. Esses construtos podem ser entendidos como variáveis 
-# não observáveis do nosso banco de dados, enquanto os fatores podem ser interpretados como as estimativas 
-# dessas variaveis não observaveis que obtidas após a realização de uma análise fatorial. Em resumo, 
-# essa técnica nos ajuda a compreender e interpretar a estrutura subjacente dos dados, simplificando 
-# a complexidade e extraindo informações que estão por trás das variáveis observadas."
+# Principal Component Analysis (PCA) is a powerful statistical technique that allows us to reduce the complexity of a dataset by identifying underlying patterns and summarizing information into latent factors. The main objective of PCA is to identify and describe these latent constructs or factors that underlie the observed variables. These constructs can be thought of as unobservable variables in our database, while the factors can be interpreted as estimates of these unobservable variables obtained through PCA. In summary, this technique helps us understand and interpret the underlying structure of data by simplifying complexity and extracting information hidden within the observed variables.
 
-# Neste caso, aplicaremos uma análise fatorial por componentes principais com base no critério de Kaiser
-# para extrair fatores que representam as principais dimensões que influenciam a qualidade de 
-# vida nas cidades brasileiras.
+# In this case, we will apply PCA based on the Kaiser criterion to extract factors representing the main dimensions influencing the quality of life in Brazilian cities.
 
-# Exploraremos um banco de dados abrangente contendo métricas/variáveis relacionadas à 
-# longevidade, educação, e renda dos habitantes, além de variáveis relacionadas à infraestrutura dessas cidades. 
-# Nosso objetivo final é criar um ranking das cidades, ordenando-as da melhor para a pior, com base nas 
-# informações extraídas do banco de dados através da análise fatorial.
+# We will explore a comprehensive database containing metrics/variables related to longevity, education, income of inhabitants, as well as variables related to the infrastructure of these cities. Our ultimate goal is to create a ranking of cities, ordering them from best to worst, based on the information extracted from the database through PCA.
 
+# Required packages
 
-# Pacotes necessários
+packages <- c("tidyverse", "ggrepel", "reshape2", "knitr", "kableExtra", "dplyr", "Hmisc", "ltm", "readxl",
+             "PerformanceAnalytics", "plotly", "factoextra", "psych", "sp", "tmap")
 
-pacotes <- c("tidyverse","ggrepel","reshape2","knitr","kableExtra","dplyr","Hmisc","ltm","readxl", 
-             "PerformanceAnalytics","plotly", "factoextra","psych","sp","tmap")
-
-if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
-  instalador <- pacotes[!pacotes %in% installed.packages()]
-  for(i in 1:length(instalador)) {
-    install.packages(instalador, dependencies = T)
-    break()}
-  sapply(pacotes, require, character = T) 
+if (sum(as.numeric(!packages %in% installed.packages())) != 0) {
+  installer <- packages[!packages %in% installed.packages()]
+  for (i in 1:length(installer)) {
+    install.packages(installer, dependencies = TRUE)
+    break()
+  }
+  sapply(packages, require, character = TRUE)
 } else {
-  sapply(pacotes, require, character = T) 
+  sapply(packages, require, character = TRUE)
 }
 
-# Carregando a base de dados
-## Vamos usar uma base de dados disponibilizada pelo IBGE na página
-dados_completos <- read_excel("A - Base 20 RMs 2000_2010.xlsx")
-## Como a base de dados original possui uma imensa quantidade de variáveis, vamos criar um novo
-## banco de dados que contenha somente as variáveis mais relevantes para a nossa análise:
-dados <- dados_completos[, c("NOME_RM", "ESPVIDA", "FECTOT", "MORT5", "SOBRE60", "E_ANOSESTUDO", "T_SUPER25M", "RDPC", "T_DES18M", "T_BANAGUA", "T_LIXO", "T_LUZ", "POP", "IDHM", "IDHM_E", "IDHM_L", "IDHM_R")]
-## Segue abaixo a legenda das variáveis escolhidas (descritas em médias ou taxas):
-## ESPVIDA = espectativa de vida;
-## FECTOT = número de filhos por mulher;
-## MORT5 = taxa de mortalidade até os 5 anos de idade;
-## SOBRE60 = taxa de sobrevivência até os 60 anos de idade;
-## E_ANOSESTUDO = anos de estudo até os 18 anos de idade;
-## T_SUPER25M = taxa de pessoas com 25 anos de idade ou mais que possuem ensino superior completo;
-## RDPC = renda familiar per capita;
-## T_DES18M = taxa de desempregados com 18 anos de idade ou mais;
-## T_BANAGUA = taxa de domicílios com banheiro e água encanados;
-## T_LIXO = taxa de domicílios atendidos por um serviço de coleta de lixo;
-## T_LUZ = taxa de domicílios com energia elétrica;
-## POP = número de pessoas que residem em domicílios fixos;
-## IDHM = índice de desenvolvimento humano municipal;
-## IDHM_E = índice de desenvolvimento humano municipal - dimensão educação;
-## IDHM_L = índice de desenvolvimento humano municipal - dimensão longevidade;
-## IDHM_R = índice de desenvolvimento humano municipal - dimensão renda;
+# Loading the dataset
+## We will use a dataset provided by IBGE on the webpage
+complete_data <- read_excel("A - Base 20 RMs 2000_2010.xlsx")
+## Since the original dataset contains a vast number of variables, we will create a new
+## database containing only the most relevant variables for our analysis:
+data <- complete_data[, c("NOME_RM", "ESPVIDA", "FECTOT", "MORT5", "SOBRE60", "E_ANOSESTUDO", "T_SUPER25M", "RDPC", "T_DES18M", "T_BANAGUA", "T_LIXO", "T_LUZ", "POP", "IDHM", "IDHM_E", "IDHM_L", "IDHM_R")]
+## Below is the legend of the selected variables (averaged or rate-based):
+## ESPVIDA = life expectancy;
+## FECTOT = number of children per woman;
+## MORT5 = under-5 mortality rate;
+## SOBRE60 = survival rate up to 60 years of age;
+## E_ANOSESTUDO = years of education up to 18 years of age;
+## T_SUPER25M = percentage of individuals aged 25 or older with completed higher education;
+## RDPC = per capita family income;
+## T_DES18M = unemployment rate for individuals aged 18 or older;
+## T_BANAGUA = percentage of households with piped water and bathroom;
+## T_LIXO = percentage of households served by a garbage collection service;
+## T_LUZ = percentage of households with electricity;
+## POP = number of people residing in fixed dwellings;
+## IDHM = municipal human development index;
+## IDHM_E = municipal human development index - education dimension;
+## IDHM_L = municipal human development index - longevity dimension;
+## IDHM_R = municipal human development index - income dimension;
 
-# Estatisticas Descitivas
+# Univariate Descriptive Statistics
 
-# Observando a base de dados
-dados %>% 
+# Observing the dataset
+data %>% 
   kable() %>%
   kable_styling(bootstrap_options = "striped", 
                 full_width = TRUE, 
                 font_size = 12)
-##colocar em bloco interativo no markdown
-# Estatísticas descritivas univariadas
-summary(dados[,2:17])
-##colocar em bloco interativo no markdown
 
-# Analisando algumas das variáveis que provavelmente são correlacionadas:
-# Vamos criar alguns gráficos para analisarmos a relação de algumas variáveis. Sabemos que os anos
-# de estudo tendem a ter relação com a renda e a empregabilidade da população. Portanto, vamos usar
-# as variáveis referentes a esses fatores para inciarmos nossas análises.
-# Scatter e ajuste linear entre os anos de estudo e a renda per capita.
-dados %>%
+# Univariate descriptive statistics
+summary(data[, 2:17])
+
+# Analyzing some variables that are likely correlated:
+# Let's create some plots to analyze the relationship between some variables. We know that years of
+# education tend to be related to income and employment of the population. Therefore, we will use
+# the variables related to these factors to start our analysis.
+# Scatter and linear fit between years of education and per capita income.
+data %>%
   ggplot() +
   geom_point(aes(x = E_ANOSESTUDO, y = RDPC),
              color = "darkorchid",
@@ -86,12 +72,12 @@ dados %>%
               formula = y ~ x, 
               se = FALSE,
               size = 1.3) +
-  labs(x = "Anos de Estudo",
-       y = "Renda per Capita") +
+  labs(x = "Years of Education",
+       y = "Per Capita Income") +
   theme_bw()
 
-# Scatter e ajuste linear entre os anos de estudo e a taxa de desemprego.
-dados %>%
+# Scatter and linear fit between years of education and unemployment rate.
+data %>%
   ggplot() +
   geom_point(aes(x = E_ANOSESTUDO, y = T_DES18M),
              color = "darkorchid",
@@ -102,225 +88,159 @@ dados %>%
               formula = y ~ x, 
               se = FALSE,
               size = 1.3) +
-  labs(x = "Anos de Estudo",
-       y = "Desemprego") +
+  labs(x = "Years of Education",
+       y = "Unemployment Rate") +
   theme_bw()
-## Podemos observar duas correlações significativas nos gráficos acima. Eles mostram uma 
-## tendência clara de aumento da renda per capita à medida que o nível de educação aumenta. 
-## Além disso, é possível notar uma relação inversa entre o desemprego e o aumento dos anos 
-## de estudo. 
-##:ps:Devido ao grande número de variáveis, não iremos plotar gráficos para todos os pares de variáveis.
 
+# Principal Component Analysis (PCA)
 
-### Elaboração da Análise Fatorial Por Componentes Principais ###
+## We will use the 'principal' function to perform our PCA. This technique involves transforming a set
+## of correlated variables into a new set of uncorrelated variables called principal components.
 
-# Coeficientes de correlação de Pearson para cada par de variáveis
-## Vamos extrair os coeficientes de correlação utilizando a função 'rcorr' e guarda-los
-## em um objeto de nome "rho".
-rho <- rcorr(as.matrix(dados[,2:17]), type="pearson")
+## Since our database has 16 variables, to preserve all the variability present in the data, we will request a total of 16 principal components.
 
-# Podemos agora extrair algumas informações do objeto "rho" que criamos:
-corr_coef <- rho$r # Matriz de correlações
-corr_coef
-## Essa matriz nos mostra os coeficientes de correlação entre os pares de variáveis.
-
-corr_sig <- round(rho$P, 5) # Matriz com p-valor dos coeficientes
-corr_sig
-## Já essa matriz nos mostra os niveis de significancia para cada par. Considerando um nivel de
-## confiança de 95%, podemos ver que quase todos os nossos pares possuem correlação significativa.
-## As execeções parecem se concetrar na variável "POP", que indica o número de pessoas que residem
-## em moradias fixas. Isso indica que a variável "POP" não possui correlação significativa com as
-## outras variáveis.
-
-# Podemos ainda elaborar uma "mapa de calor" para melhor visualizarmos as informações vistas acima:
-# Elaboração de um mapa de calor das correlações de Pearson entre as variáveis
-ggplotly(
-  dados[,2:17] %>%
-    cor() %>%
-    melt() %>%
-    rename(Correlação = value) %>%
-    ggplot() +
-    geom_tile(aes(x = Var1, y = Var2, fill = Correlação)) +
-    geom_text(aes(x = Var1, y = Var2, label = format(Correlação, digits = 1)),
-              size = 5) +
-    scale_fill_viridis_b() +
-    labs(x = NULL, y = NULL) +
-    theme_bw())
-##_ps: as cores mais "quentes" indicam maior correlação positiva, enquanto as cores "frias" indicam
-## inxistência de correlação ou correlação negativa.
-
-# Também podemos visualizar essas informações através da função 'chart.Correlation':
-chart.Correlation(dados[, 2:17], histogram = TRUE, pch = "+")
-## essa função nos permite visualizar os gráficos que plotamos no início juntamente as coeficientes 
-## de correlação dos pares de variáveis.
-
-# Teste de esfericidade de Bartlett
-## O teste de esfericidade de Bartlett é uma análise estatística utilizada para verificar se as 
-## variáveis em um conjunto de dados estão correlacionadas entre si. Apesar de ja termos verificado
-## o indício de correlações, vamos usar o teste de Bartlett através da função 'cortest.bartlett'
-## como um meio de confirmação:
-
-cortest.bartlett(dados[, 2:17])
-
-## Obtivemos um valor-p muito próximo de zero, e isso indica que as variáveis nos dados não são 
-## independentes entre si, sugerindo a presença de correlação significativa entre elas.
-
-
-# Análise Fatorial por Componentes Principais (PCA)
-
-## Utilizaremos a função 'principal' para realizarmos nossa análise fatorial. Essa técnica consiste
-## em transformar um conjunto de variáveis correlacionadas em um novo conjunto de variáveis 
-## não correlacionadas denominadas de componentes principais.
-
-
-## Como o nosso banco de dados possui 16 variáveis, para preservarmos toda a variabilidade presente nos dados, iremos 
-## requisitar um total de 16 componentes principais.
-
-fatorial <- principal(dados[2:17],
-                      nfactors = length(dados[2:17]),
+factorial <- principal(data[2:17],
+                      nfactors = length(data[2:17]),
                       rotate = "none",
                       scores = TRUE)
 
-## Vamos olhar as cargas fatoriais dos nossos componentes:
-fatorial
-## As cargas fatoriais indicam, através de uma escala de -1 até 1, o quanto cada variável contribui
-## para a formação do componente. Conseguentemente, podemos ver que o nosso primeiro componente parece
-## capturar uma boa porção da variabilidade dos dados.
+## Let's look at the factor loadings of our components:
+factorial
 
-# Identificação inicial de todos os autovalores
-## Os autovalores indicam a variabilidade de cada componente. Vamos exibir nossos autovalores com
-## 5 casas decimais.
-autovalores <- round(fatorial$values, 5)
-autovalores
-## É importante reparar que apenas 2 autovalores são maiores que 1, pois esse detalhe é relevante
-## para a continuação da nossa análise com base no critério de Kaiser.
+## The factor loadings indicate, on a scale from -1 to 1, how much each variable contributes
+## to the formation of the component. We can see that our first component seems to capture a good
+## portion of the data's variability.
 
-## Somando nossos autovalores para conferir que a soma resulta no exato número de variáveis do nosso
-## banco:
-sum(autovalores)
+# Initial identification of all eigenvalues
+## Eigenvalues indicate the variability of each component. Let's display our eigenvalues with 5 decimal places.
+eigenvalues <- round(factorial$values, 5)
+eigenvalues
 
-## Como o objetivo da análise fatorial é simplificar e condensar a quantidade de informação
-## contida nas variáveis originais. Vamos fazer essa simplificação agora com base no critério de
-## Kaiser. O critério de Kaiser diz que apenas os fatores com autovalores (eigenvalues) maiores 
-## do que 1 devem ser considerados significativos. Isso significa que apenas os fatores que 
-## explicam uma quantidade de variância maior do que uma variável individual serão retidos.
+## It is important to note that only 2 eigenvalues are greater than 1 because this detail is relevant
+## for the continuation of our analysis based on the Kaiser criterion.
 
-# Definição da quantidade de fatores com autovalores maiores que 1
-k <- sum(autovalores > 1)
+## Summing our eigenvalues to check if the sum results in the exact number of variables in our dataset:
+sum(eigenvalues)
+
+## As the goal of PCA is to simplify and condense the amount of information
+## contained in the original variables, let's do this simplification now based on the Kaiser criterion. The Kaiser criterion states that only factors with eigenvalues greater than 1 should be considered significant. This means that only factors that explain more variance than an individual variable will be retained.
+
+# Defining the number of factors with eigenvalues greater than 1
+k <- sum(eigenvalues > 1)
 print(k)
-## Como apenas 2 dos nossos autovalores são maiores do que 1, apenas 2 fatores serão preservados.
 
-# Reaplicando a análise fatorial através da função 'pincipal' com os 2 primeiros componentes apenas.
-fatorial2 <- principal(dados[2:17],
+## Since only 2 of our eigenvalues are greater than 1, only 2 factors will be retained.
+
+# Reapplying the PCA analysis using the 'principal' function with only the first 2 components.
+factorial2 <- principal(data[2:17],
                       nfactors = k,
                       rotate = "none",
                       scores = TRUE)
 
-fatorial2
+factorial2
 
-## Nota-se aqui que o primeiro componente demonstra alta capacidade de condensar as informações das
-## variáveis originais.
+## It can be seen here that the first component demonstrates a high ability to condense information from
+## the original variables.
 
-# Identificação da variância compartilhada em cada 
-variancia_compartilhada <- as.data.frame(fatorial2$Vaccounted) %>% 
+# Identifying the shared variance in each component
+shared_variance <- as.data.frame(factorial2$Vaccounted) %>% 
   slice(1:3)
 
-rownames(variancia_compartilhada) <- c("Autovalores",
-                                       "Prop. da Variância",
-                                       "Prop. da Variância Acumulada")
-round(variancia_compartilhada, 3) %>%
-  kable() %>%
-  kable_styling(bootstrap_options = "striped", 
-                full_width = FALSE, 
-                font_size = 20)
-## Aqui conseguimos ver que o nossos 2 primeiros componente capturam aproximadamente 81% da variância
-## dos dados originais.
-
-# Visualização dos scores fatoriais
-scores_fatoriais <- as.data.frame(fatorial2$weights)
-
-round(scores_fatoriais, 3) %>%
+rownames(shared_variance) <- c("Eigenvalues",
+                                "Proportion of Variance",
+                                "Cumulative Proportion of Variance")
+round(shared_variance, 3) %>%
   kable() %>%
   kable_styling(bootstrap_options = "striped", 
                 full_width = FALSE, 
                 font_size = 20)
 
-## Os scores fatoriais representam a contribuição de cada observação para a construção de cada
-## componente principal. Eles são calculados multiplicando as cargas fatoriais (pesos) dos componentes principais 
-## pelas variáveis originais de cada observação e somando esses produtos.
+## Here we can see that our first 2 components capture approximately 81% of the variance
+## in the original data.
 
-# Visualização dos fatores propriamente ditos
-fatores <- as.data.frame(fatorial2$scores)
+# Visualizing factor scores
+factor_scores <- as.data.frame(factorial2$weights)
 
-fatores
+round(factor_scores, 3) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = "striped", 
+                full_width = FALSE, 
+                font_size = 20)
 
-## Os fatores são calculados multiplicando os scores fatoriais pelos desvios padrão dos componentes 
-## principais. Os fatores na análise fatorial representam as pontuações individuais das observações nos 
-## construtos teóricos subjacentes.
+## Factor scores represent the contribution of each observation to the construction of each
+## principal component. They are calculated by multiplying the factor loadings (weights) of the principal components
+## by the original variables of each observation and summing these products.
 
-# Coeficientes de correlação de Pearson para cada par de fatores (ortogonais)
-rho2 <- rcorr(as.matrix(fatores), type="pearson")
+# Visualizing the factors themselves
+factors <- as.data.frame(factorial2$scores)
+
+factors
+
+## Factors are calculated by multiplying the factor scores by the standard deviations of the principal components.
+## In factor analysis, factors represent the individual scores of observations on the underlying theoretical constructs.
+
+# Pearson correlation coefficients for each pair of orthogonal factors
+rho2 <- rcorr(as.matrix(factors), type = "pearson")
 round(rho2$r, 4)
-## Aqui podemos notar que nosso fatores não possuem correlação entre si. Podemos dizer que os fatore
-## são ortogonais e não compartilham nenhuma variância em comum. Isso indica que os mesmos representam
-## dimensões distintas do construto latente, e conseguentemente facilitam a interpretação dos resultados.
 
-# Visualização das comunalidades 
-comunalidades <- as.data.frame(unclass(fatorial2$communality)) %>%
-  rename(comunalidades = 1)
+## Here we can see that our factors are not correlated with each other. We can say that the factors
+## are orthogonal and do not share any common variance. This indicates that they represent
+## distinct dimensions of the latent construct, making the interpretation of results easier.
 
-round(comunalidades, 3) %>%
+# Visualization of communalities
+communalities <- as.data.frame(unclass(factorial2$communality)) %>%
+  rename(communalities = 1)
+
+round(communalities, 3) %>%
   kable() %>%
   kable_styling(bootstrap_options = "striped",
                 full_width = FALSE,
                 font_size = 20)
-## A comunalidade é uma medida importante. Ela varia de 0 a 1, sendo 0 indicativo de que a 
-## variável não tem relação com nenhum dos fatores e 1 indicativo de que a variável está 
-## perfeitamente relacionada com pelo menos um dos fatores. Podemos ver que, graças ao critério de
-## Kaiser, apesar de termos preservados apenas 2 fatores, estamos conseguindo capturar boa parte
-## da variabilidade dos dados originais.
 
-# Rank das cidades
+## Communality is an important measure. It ranges from 0 to 1, with 0 indicating that the
+## variable has no relationship with any of the factors and 1 indicating that the variable is
+## perfectly related to at least one of the factors. We can see that, thanks to the Kaiser criterion,
+## even though we retained only 2 factors, we are capturing a good portion
+## of the variability in the original data.
 
-# Vamos criar um banco de dados com os fatores para elaborarmos o rank das cidades:
-dados_fatores <- bind_cols(dados,
-                           "fator_1" = fatores$PC1, 
-                           "fator_2" = fatores$PC2)
+# City Rankings
 
-# Assumindo-se apenas os 2 fatores como indicadores, calcula-se a "pontuação".
-# Onde a pontuação nesse esse tipo de experimento é geralmente considerada como 
-# sendo fator * variância compartilhada por aquele fator.
+# Let's create a database with the factors to create city rankings:
+data_factors <- bind_cols(data,
+                           "factor_1" = factors$PC1, 
+                           "factor_2" = factors$PC2)
 
-dados_rank <- dados_fatores %>% 
-  mutate(pontuacao = fator_1 * variancia_compartilhada$PC1[2] + fator_2 * variancia_compartilhada$PC2[2])
+# Assuming only the 2 factors as indicators, calculate the "score."
+# In this type of experiment, the score is usually considered as
+# factor * variance shared by that factor.
 
-# Visualizando o ranking final em ordem decrescente
-dados_rank[,c(1, 20)] %>%
-  arrange(desc(pontuacao)) %>% 
+rank_data <- data_factors %>% 
+  mutate(score = factor_1 * shared_variance$PC1[2] + factor_2 * shared_variance$PC2[2])
+
+# Visualizing the final ranking in descending order
+rank_data[, c(1, 20)] %>%
+  arrange(desc(score)) %>% 
   kable() %>%
   kable_styling(bootstrap_options = "striped", 
-                full_width = T, 
+                full_width = TRUE, 
                 font_size = 12)
 
-## Ao analisar o rank das cidades com base na análise fatorial por componentes principais, 
-## observamos que ele reflete de maneira consistente a realidade brasileira. Cidades como 
-## São Paulo, Campinas e Curitiba ocupam as primeiras posições, enquanto as regiões metropolitanas 
-## estão nas últimas posições. Isso evidencia a capacidade da análise de dados em resumir informações 
-## complexas contidas em um extenso banco de dados em apenas dois fatores.
+## When analyzing the city ranking based on principal component analysis (PCA),
+## we observe that it consistently reflects the Brazilian reality. Cities like
+## São Paulo, Campinas, and Curitiba occupy the top positions, while metropolitan regions
+## are at the bottom. This highlights the ability of data analysis to summarize complex information
+## contained in an extensive database into just two factors.
 
-## A análise fatorial por componentes principais não apenas nos permitiu criar um rank das 
-## cidades, mas também nos proporcionou insights valiosos sobre os construtos latentes 
-## subjacentes às variáveis observadas. Durante o processo de análise, pudemos identificar e 
-## compreender alguns dos fatores que influenciam a longevidade, educação, renda e 
-## infraestrutura nas cidades brasileiras.
+## Principal Component Analysis not only allows us to create a city ranking,
+## but also provides valuable insights into the underlying constructs related to longevity,
+## education, income, and infrastructure in Brazilian cities. During the analysis process,
+## we identified and understood some of the factors influencing these dimensions in the cities.
 
-## Além do rank, a análise fatorial por componentes principais pode ter diversas outras utilidades 
-## em projetos de ciência de dados. Ela pode servir como base para a criação de índices ou scores 
-## que quantificam a performance das observações, auxiliar na identificação de variáveis-chave 
-## que impactam os construtos latentes e fornecer uma visão mais clara da estrutura dos dados.
+## In addition to ranking, PCA can have various other uses in data science projects. It can serve as
+## a basis for creating indices or scores that quantify the performance of observations, help identify
+## key variables that impact latent constructs, and provide a clearer view of data structure.
 
-## Dessa forma, a análise fatorial por componentes principais demonstrou-se uma ferramenta poderosa 
-## para a compreensão e interpretação de um banco de dados complexo, permitindo a extração de informações 
-## relevantes de maneira mais simples e concisa. Essa abordagem contribui para embasar tomadas 
-## de decisão fundamentadas e promover uma compreensão mais profunda de fenômenos derivados das
-## relações entre as variáveis.
+## Thus, principal component analysis has proven to be a powerful tool for understanding and interpreting
+## complex databases, allowing the extraction of relevant information in a simpler and more concise manner.
+## This approach contributes to informed decision-making and promotes a deeper understanding of phenomena
+## resulting from the relationships between variables.
