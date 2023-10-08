@@ -1,244 +1,242 @@
 #########################
-# Instalação de pacotes #
+# Package Installation  #
 #########################
 
-pacotes <- c('tidyverse', 'rpart', 'rpart.plot', 'gtools', 'Rmisc', 'scales', 'caret', 'plotROC')
+packages <- c('tidyverse', 'rpart', 'rpart.plot', 'gtools', 'Rmisc', 'scales', 'caret', 'plotROC')
 
-if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
-  instalador <- pacotes[!pacotes %in% installed.packages()]
-  for(i in 1:length(instalador)) {
-    install.packages(instalador, dependencies = T)
-    break()}
-  sapply(pacotes, require, character = T) 
+if (sum(as.numeric(!packages %in% installed.packages())) != 0) {
+  installer <- packages[!packages %in% installed.packages()]
+  for (i in 1:length(installer)) {
+    install.packages(installer, dependencies = TRUE)
+    break()
+  }
+  sapply(packages, require, character = TRUE) 
 } else {
-  sapply(pacotes, require, character = T) 
+  sapply(packages, require, character = TRUE) 
 }
 
 #######################################################
-# CRIANDO A BASE DE DADOS PARA SER USADA NO EXERCÍCIO #
+# CREATING THE DATASET TO BE USED IN THE EXERCISE #
 #######################################################
 
-set.seed(42)  # Define uma semente aleatória para reprodução dos resultados
+set.seed(42)  # Set a random seed for result reproducibility
 
-# Gerar as variáveis simuladas com correlação
-idade <- sample(18:70, 10000, replace = TRUE)
+# Generate simulated variables with correlation
+age <- sample(18:70, 10000, replace = TRUE)
 
-# Gerar variáveis correlacionadas usando a função rmvnorm() do pacote mvtnorm
+# Generate correlated variables using the rmvnorm() function from the mvtnorm package
 library(mvtnorm)
 
-mean_values <- c(5000, 2000, 0.5, 5)  # Médias das variáveis
-correlation_matrix <- matrix(c(1, 0.3, 0.2, -0.1, 0.3, 1, -0.1, 0.2, 0.2, -0.1, 1, 0.4, -0.1, 0.2, 0.4, 1), nrow = 4)  # Matriz de correlação
+mean_values <- c(5000, 2000, 0.5, 5)  # Means of the variables
+correlation_matrix <- matrix(c(1, 0.3, 0.2, -0.1, 0.3, 1, -0.1, 0.2, 0.2, -0.1, 1, 0.4, -0.1, 0.2, 0.4, 1), nrow = 4)  # Correlation matrix
 
 simulated_data <- rmvnorm(10000, mean = mean_values, sigma = correlation_matrix)
 
-renda <- simulated_data[, 1]
-divida <- simulated_data[, 2]
-utilizacao_credito <- pmin(pmax(simulated_data[, 3], 0), 1)  # Limita a utilização de crédito entre 0 e 1
-consultas_recentes <- pmax(simulated_data[, 4], 0)  # Garante que o número de consultas recentes seja não negativo
+income <- simulated_data[, 1]
+debt <- simulated_data[, 2]
+credit_utilization <- pmin(pmax(simulated_data[, 3], 0), 1)  # Limit credit utilization between 0 and 1
+recent_queries <- pmax(simulated_data[, 4], 0)  # Ensure that the number of recent queries is non-negative
 
-# Gerar função linear das variáveis explicativas
-preditor_linear <- -7 - 0.01*idade - 0.0002*renda + 0.003*divida - 3*utilizacao_credito + 0.5*consultas_recentes
+# Generate a linear function of explanatory variables
+linear_predictor <- -7 - 0.01 * age - 0.0002 * income + 0.003 * debt - 3 * credit_utilization + 0.5 * recent_queries
 
-# Calcular probabilidade de default (PD) usando a função de link logit
-prob_default <- plogis(preditor_linear)
-#OBS: problogis(x) é equivalente ao 1/(1+exp(-x))
+# Calculate default probability (PD) using the logit link function
+prob_default <- plogis(linear_predictor)
+# Note: plogis(x) is equivalent to 1/(1+exp(-x))
 
-# Gerar inadimplência como variável Bernoulli com base na probabilidade de default
+# Generate default as a Bernoulli variable based on the default probability
+default <- rbinom(10000, size = 1, prob = prob_default)
 
+# Create a dataframe
+data <- data.frame(age, income, debt, credit_utilization, recent_queries, default)
+data$default <- ifelse(data$default == 0, "N", "Y")
+data$default <- factor(data$default)
 
-inadimplencia <- rbinom(10000, size = 1, prob = prob_default)
-
-# Criar dataframe
-dados <- data.frame(idade, renda, divida, utilizacao_credito, consultas_recentes, inadimplencia)
-dados$inadimplencia <- ifelse(dados$inadimplencia == 0, "N", "Y")
-dados$inadimplencia <- factor(dados$inadimplencia)
-
-head(dados)
+head(data)
 
 #####################################################################################
 
 ##################################################
-#Separando o dataset e criando a primeira árvore #
+# Separating the dataset and creating the first tree #
 ################################################## 
 
-# Vamos separar a base em treinamento e teste #
+# Let's split the dataset into training and testing #
 set.seed(123)
 
+## Creating a vector to divide the dataset in a 75/25 proportion
+training_bool <- stats::runif(dim(data)[1]) > 0.25
 
-## criando um vetor para dividir o dataset em uma porporção de 75/25
-bool_treino <- stats::runif(dim(dados)[1])>.25
+## Using the vector to split the dataset into "training" and "testing"
+training_data <- data[training_bool, ]
+testing_data <- data[!training_bool, ]
 
-## usando o vetor para separar o dataset em "treino" e "teste"
-treino <- dados[bool_treino,]
-teste  <- dados[!bool_treino,]
+data %>% str
 
-dados %>% str
+## Creating an "unconstrained" tree using the "training" dataset 
+tree <- rpart::rpart(default ~ age + income + debt + credit_utilization + recent_queries,
+                     data = training_data,
+                     method = 'class',
+                     xval = 5,
+                     control = rpart.control(cp = 0, 
+                                             minsplit = 1, 
+                                             maxdepth = 30))
 
-## criando uma arvore "sem restrições" usando o dataset "treino" 
-arvore <- rpart::rpart(inadimplencia ~ idade + renda + divida + utilizacao_credito + consultas_recentes,
-                       data=treino,
-                       method='class',
-                       xval=5,
-                       control = rpart.control(cp = 0, 
-                                               minsplit = 1, 
-                                               maxdepth = 30))
-
-# Verificando a complexidade da árvore
-arvore$frame
+# Checking the tree's complexity
+tree$frame
 
 ##################################################
-# Avaliando a árvore nas bases de treino e teste #
+# Evaluating the tree on training and testing sets #
 ##################################################
 
-## Usando `predict` para armazenar no obj. "p_treino" as previsoes da arvore usando os datasets
-## de treino e de teste. Depois disso transformamos os valores preditos em Y ou N tendo como
-## corte a probabilidade de 0,5. e salvamos no obj."c_treino".
-p_treino = stats::predict(arvore, treino)
-c_treino = base::factor(ifelse(p_treino[,2]>.5, "Y", "N"))
-p_teste = stats::predict(arvore, teste)
-c_teste = base::factor(ifelse(p_teste[,2]>.5, "Y", "N"))
+## Using `predict` to store predictions from the tree using the training and testing datasets.
+## Then, we transform the predicted values into Y or N with a cutoff of 0.5 and save them in the "c_train" object.
+p_train = stats::predict(tree, training_data)
+c_train = base::factor(ifelse(p_train[, 2] > 0.5, "Y", "N"))
+p_test = stats::predict(tree, testing_data)
+c_test = base::factor(ifelse(p_test[, 2] > 0.5, "Y", "N"))
 
-## Olhando a acurácia da árvore em relação as obs. do dataset "treino"
-tab <- table(c_treino, treino$inadimplencia)
-acc <- (tab[1,1]+tab[2,2])/nrow(treino)
-sprintf('Acurácia na base de treino: %s ', percent(acc))
+## Looking at the accuracy of the tree on the "training" dataset observations
+tab_train <- table(c_train, training_data$default)
+acc_train <- (tab_train[1, 1] + tab_train[2, 2]) / nrow(training_data)
+sprintf('Accuracy on training set: %s ', percent(acc_train))
 
-## Olhando a acurácia da árvore em relação as obs. do dataset "teste"
-tab2 <- table(c_teste, teste$inadimplencia)
-acc2 <- (tab2[1,1]+tab2[2,2])/nrow(teste)
-sprintf('Acurácia na base de teste: %s ', percent(acc2))
+## Looking at the accuracy of the tree on the "testing" dataset observations
+tab_test <- table(c_test, testing_data$default)
+acc_test <- (tab_test[1, 1] + tab_test[2, 2]) / nrow(testing_data)
+sprintf('Accuracy on testing set: %s ', percent(acc_test))
 
 ###############################
-# Curva ROC TREINO            #
+# ROC Curve TRAINING           #
 ###############################
 
-# Vamos calcular a área da curva ROC com uma função no Caret
-# A função é o twoClassSummary, que espera como entrada um dataframe com esse layout:
-# obs: uma coluna contendo um fator com as classes observadas
-# pred: fator com as classes preditas
-# Y: contém a probabilidade da inadimplencia
-# N: contém a probabilidade da não-inadimplencia
-aval_treino <- data.frame(obs=treino$inadimplencia, 
-                          pred=c_treino,
-                          Y = p_treino[,2],
-                          N = 1-p_treino[,2]
+# Let's calculate the area under the ROC curve using the Caret package's twoClassSummary function.
+# The function expects input in the form of a dataframe with this layout:
+# obs: a column containing a factor with observed classes
+# pred: a factor with predicted classes
+# Y: contains the probability of default
+# N: contains the probability of non-default
+eval_train <- data.frame(obs = training_data$default, 
+                          pred = c_train,
+                          Y = p_train[, 2],
+                          N = 1 - p_train[, 2]
 )
 
-caret::twoClassSummary(aval_treino, lev=levels(aval_treino$obs))
+caret::twoClassSummary(eval_train, lev = levels(eval_train$obs))
 
-# Podemos usar o mesmo dataframe para fazer a curva ROC:
-CurvaROC <- ggplot2::ggplot(aval_treino, aes(d = obs, m = Y, colour='1')) + 
+# We can use the same dataframe to create the ROC curve:
+ROC_curve_train <- ggplot2::ggplot(eval_train, aes(d = obs, m = Y, colour='1')) + 
   plotROC::geom_roc(n.cuts = 0) +
-  scale_color_viridis_d(direction = -1, begin=0, end=.25) +
+  scale_color_viridis_d(direction = -1, begin = 0, end = .25) +
   theme(legend.position = "none") +
-  ggtitle("Curva ROC - base de treino")
+  ggtitle("ROC Curve - training set")
 
-CurvaROC
+ROC_curve_train
 
 ###############################
-# Curva ROC TESTE             #
+# ROC Curve TESTING            #
 ###############################
-aval_teste <- data.frame(obs=teste$inadimplencia, 
-                         pred=c_teste,
-                         Y = p_teste[,2],
-                         N = 1-p_teste[,2]
+eval_test <- data.frame(obs = testing_data$default, 
+                         pred = c_test,
+                         Y = p_test[, 2],
+                         N = 1 - p_test[, 2]
 )
 
-twoClassSummary(aval_teste, lev=levels(aval_teste$obs))
+twoClassSummary(eval_test, lev = levels(eval_test$obs))
 
-# Podemos usar o mesmo dataframe para fazer a curva ROC:
-CurvaROC2 <- ggplot(aval_teste, aes(d = obs, m = Y, colour='a')) + 
+# We can use the same dataframe to create the ROC curve:
+ROC_curve_test <- ggplot(eval_test, aes(d = obs, m = Y, colour='1')) + 
   plotROC::geom_roc(n.cuts = 0) +
-  scale_color_viridis_d(direction = -1, begin=0, end=.25) +
+  scale_color_viridis_d(direction = -1, begin = 0, end = .25) +
   theme(legend.position = "none") +
-  ggtitle("Curva ROC - base de teste")
+  ggtitle("ROC Curve - testing set")
 
-CurvaROC2
+ROC_curve_test
 
-## A nossa curva ROC usando os dados de teste não possui uma acurácia muito boa... Isso acontece
-## provavelmente devio a um "overfitting" da nossa árvore em relação aos dados de treino. Vamos limitar
-## o "complexity parameter" (cp) da árvore para tentarmos resolver esse problema.
+## Our ROC curve using the testing data does not have a very good accuracy... This is probably
+## due to overfitting of our tree to the training data. Let's limit the "complexity parameter" (cp) of the tree
+## to try to address this issue.
 
 ###############################
-# Árvore podada (Grid Search) #
+# Pruned Tree (Grid Search)   #
 ###############################
 
-## Vamos definir e salvar o menor "complexity parameter" em um obj. chamado "cp_min"
-tab_cp <- rpart::printcp(arvore)
+## Let's define and save the smallest "complexity parameter" in an object called "cp_min"
+tab_cp <- rpart::printcp(tree)
 tab_cp
 
-plotcp(arvore)
+plotcp(tree)
 
-tab_cp[which.min(tab_cp[,'xerror']),]
-cp_min <- tab_cp[which.min(tab_cp[,'xerror']),'CP']
+tab_cp[which.min(tab_cp[, 'xerror']),]
+cp_min <- tab_cp[which.min(tab_cp[, 'xerror']), 'CP']
 
-## Criando uma nova árvore a partir do CP definido anteriormente
+## Creating a new tree from the previously defined CP
 set.seed(1)
-arvore_poda <- rpart::rpart(inadimplencia ~ idade + renda + divida + utilizacao_credito + consultas_recentes,
-                            data=treino,
-                            method='class',
-                            xval=0,
+pruned_tree <- rpart::rpart(default ~ age + income + debt + credit_utilization + recent_queries,
+                            data = training_data,
+                            method = 'class',
+                            xval = 0,
                             control = rpart.control(cp = cp_min, 
                                                     minsplit = 1, 
                                                     maxdepth = 30))
 
 ###########################################################
-# Avaliando a árvore "podada" nas bases de treino e teste #
+# Evaluating the "pruned" tree on training and testing sets #
 ###########################################################
 
-p_treino_poda = stats::predict(arvore_poda, treino)
-c_treino_poda = base::factor(ifelse(p_treino_poda[,2]>.5, "Y", "N"))
-p_teste_poda = stats::predict(arvore_poda, teste)
-c_teste_poda = base::factor(ifelse(p_teste_poda[,2]>.5, "Y", "N"))
+p_train_pruned = stats::predict(pruned_tree, training_data)
+c_train_pruned = base::factor(ifelse(p_train_pruned[, 2] > 0.5, "Y", "N"))
+p_test_pruned = stats::predict(pruned_tree, testing_data)
+c_test_pruned = base::factor(ifelse(p_test_pruned[, 2] > 0.5, "Y", "N"))
 
-# Dataset de treino
-aval_treino_poda <- data.frame(obs=treino$inadimplencia, 
-                          pred=c_treino_poda,
-                          Y = p_treino_poda[,2],
-                          N = 1-p_treino_poda[,2]
+# Training dataset
+eval_train_pruned <- data.frame(obs = training_data$default, 
+                          pred = c_train_pruned,
+                          Y = p_train_pruned[, 2],
+                          N = 1 - p_train_pruned[, 2]
 )
 
-caret::twoClassSummary(aval_treino_poda, lev=levels(aval_treino_poda$obs))
+caret::twoClassSummary(eval_train_pruned, lev = levels(eval_train_pruned$obs))
 
-# Curva ROC para a árvore "podada" da base de treino
-CurvaROC3 <- ggplot2::ggplot(aval_treino_poda, aes(d = obs, m = Y, colour='1')) + 
+# ROC curve for the "pruned" tree on the training dataset
+ROC_curve_train_pruned <- ggplot2::ggplot(eval_train_pruned, aes(d = obs, m = Y, colour='1')) + 
   plotROC::geom_roc(n.cuts = 0) +
-  scale_color_viridis_d(direction = -1, begin=0, end=.25) +
+  scale_color_viridis_d(direction = -1, begin = 0, end = .25) +
   theme(legend.position = "none") +
-  ggtitle("Curva ROC_poda - base de treino")
+  ggtitle("ROC Curve_pruned - training set")
 
-CurvaROC3
+ROC_curve_train_pruned
 
-#Dataset de teste
-aval_teste_poda <- data.frame(obs=teste$inadimplencia, 
-                         pred=c_teste_poda,
-                         Y = p_teste_poda[,2],
-                         N = 1-p_teste_poda[,2]
+# Testing dataset
+eval_test_pruned <- data.frame(obs = testing_data$default, 
+                         pred = c_test_pruned,
+                         Y = p_test_pruned[, 2],
+                         N = 1 - p_test_pruned[, 2]
 )
 
-twoClassSummary(aval_teste_poda, lev=levels(aval_teste_poda$obs))
+twoClassSummary(eval_test_pruned, lev = levels(eval_test_pruned$obs))
 
-# Curva ROC para a árvore "podada" da base de teste
-CurvaROC4 <- ggplot2::ggplot(aval_treino_poda, aes(d = obs, m = Y, colour='1')) + 
+# ROC curve for the "pruned" tree on the testing dataset
+ROC_curve_test_pruned <- ggplot(eval_train_pruned, aes(d = obs, m = Y, colour='1')) + 
   plotROC::geom_roc(n.cuts = 0) +
-  scale_color_viridis_d(direction = -1, begin=0, end=.25) +
+  scale_color_viridis_d(direction = -1, begin = 0, end = .25) +
   theme(legend.position = "none") +
-  ggtitle("Curva ROC_poda - base de teste")
+  ggtitle("ROC Curve_pruned - testing set")
 
-CurvaROC4
+ROC_curve_test_pruned
 
 ################################
-# Visualizando a árvore podada #
+# Visualizing the pruned tree  #
 ################################
 
-# Definindo uma paleta de cores
-paleta = scales::viridis_pal(begin=.75, end=1)(20)
+# Defining a color palette
+palette = scales::viridis_pal(begin = .75, end = 1)(20)
 
-# Plotando a árvore
-rpart.plot::rpart.plot(arvore_poda,
-                       box.palette = paleta) # Paleta de cores
+# Plotting the tree
+rpart.plot::rpart.plot(pruned_tree,
+                       box.palette = palette) # Color palette
 
-# Plot alternativo da árvore
-prp(arvore_poda, box.palette = paleta)
+# Alternative tree plot
+prp(pruned_tree, box.palette = palette)
+
 
 
