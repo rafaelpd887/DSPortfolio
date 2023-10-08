@@ -1,422 +1,402 @@
-# A clusterização, também conhecida como análise de agrupamento, é uma técnica de aprendizado não 
-# supervisionado utilizada para identificar padrões e estruturas em conjuntos de dados. O objetivo 
-# principal da clusterização é agrupar objetos similares em clusters e objetos diferentes em clusters 
-# distintos, de acordo com alguma medida de similaridade ou dissimilaridade entre eles. A clusterização 
-# tem várias utilidades como a segmentação de clientes, a detecção de anomalias, a exploração de 
-# dados no geral, além de outras. Conseguentemente, a análise de cluster possui aplicações em 
-# diferentes áreas.
+# Clustering, also known as cluster analysis, is an unsupervised learning technique used to identify patterns and structures in datasets. The main goal of clustering is to group similar objects into clusters and different objects into distinct clusters based on some measure of similarity or dissimilarity between them. Clustering has various applications such as customer segmentation, anomaly detection, exploratory data analysis, among others. Consequently, cluster analysis has applications in different domains.
 
-# O conjunto de dados utilizado nesse projeto se refere a clientes de um distribuidor atacadista Portuguesa. 
-# Ele inclui os gastos anuais em unidades monetárias (u.m) em diversas categorias de produtos.
+# The dataset used in this project refers to customers of a Portuguese wholesale distributor. It includes annual spending in monetary units (u.m) on various product categories.
 
-# As observaçoes se referem aos clientes, e as variáveis se dividem da seguinte forma:
-# FRESH: gastos anuais (u.m.) em produtos frescos (Contínuo);
-# MILK: gastos anuais (u.m.) em produtos lácteos (Contínuo);
-# GROCERY: gastos anuais (u.m.) em produtos de mercearia (Contínuo);
-# FROZEN: gastos anuais (u.m.) em produtos congelados (Contínuo);
-# DETERGENTS_PAPER: gastos anuais (u.m.) em produtos de limpeza e papelaria (Contínuo);
-# DELICATESSEN: gastos anuais (u.m.) em produtos de delicatessen (Contínuo);
-# CHANNEL: canal dos clientes - Horeca (Hotel/Restaurante/Café) ou canal de varejo (Nominal);
-# REGION: região dos clientes - Lisboa, Porto ou Outra (Nominal).
+# Observations refer to customers, and variables are divided as follows:
+# FRESH: annual spending (u.m.) on fresh products (Continuous);
+# MILK: annual spending (u.m.) on dairy products (Continuous);
+# GROCERY: annual spending (u.m.) on grocery products (Continuous);
+# FROZEN: annual spending (u.m.) on frozen products (Continuous);
+# DETERGENTS_PAPER: annual spending (u.m.) on detergents and paper products (Continuous);
+# DELICATESSEN: annual spending (u.m.) on deli products (Continuous);
+# CHANNEL: customer channel - Horeca (Hotel/Restaurant/Cafe) or Retail channel (Nominal);
+# REGION: customer region - Lisbon, Porto, or Other (Nominal).
 
-# Sendo "CHANNEL" e "REGION" variáveis categóricas e o restante sendo variáveis quantitativas.
+# With "CHANNEL" and "REGION" as categorical variables and the rest being quantitative variables.
 
-# Nesse projeto realizaremos um processo de clusterização hierárquica, e um processo de clusterização
-# "k-means". Em resumo, faremos uma análise de clusters onde o número de clusters será definido durante
-# o processo (método hierárquico), e uma análise onde a quantidade de clusters será definida a priori.
-# Desse modo, poderemos usar uma prática comum entre os cientistas de dados que consiste em usar o 
-# "output" do método hierárquico como "input" do método "k-means".
+# In this project, we will perform a hierarchical clustering process and a "k-means" clustering process. In summary, we will conduct a cluster analysis where the number of clusters will be defined during the process (hierarchical method), and an analysis where the number of clusters will be defined a priori. This way, we can use a common practice among data scientists, which involves using the "output" of the hierarchical method as the "input" for the "k-means" method.
 
+# Installation and loading of used packages
 
-# Instalação e carregamento dos pacotes utilizados
+packages <- c("plotly", "fastDummies", # graphical platform
+             "tidyverse", # load other R packages
+             "ggrepel", # text and label geoms for 'ggplot2' to prevent text overlap
+             "knitr", "kableExtra", # table formatting
+             "reshape2", # 'melt' function
+             "misc3d", # 3D plots
+             "plot3D", # 3D plots
+             "cluster", # 'agnes' function for hierarchical clustering
+             "factoextra", # 'fviz_dend' function for dendrogram construction
+             "ade4") # 'ade4' function for distance matrix in binary variables
 
-pacotes <- c("plotly", "fastDummies", #plataforma gráfica
-             "tidyverse", #carregar outros pacotes do R
-             "ggrepel", #geoms de texto e rótulo para 'ggplot2' que ajudam a
-             #evitar sobreposição de textos
-             "knitr", "kableExtra", #formatação de tabelas
-             "reshape2", #função 'melt'
-             "misc3d", #gráficos 3D
-             "plot3D", #gráficos 3D
-             "cluster", #função 'agnes' para elaboração de clusters hierárquicos
-             "factoextra", #função 'fviz_dend' para construção de dendrogramas
-             "ade4") #função 'ade4' para matriz de distâncias em var. binárias
-
-if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
-  instalador <- pacotes[!pacotes %in% installed.packages()]
-  for(i in 1:length(instalador)) {
-    install.packages(instalador, dependencies = T)
-    break()}
-  sapply(pacotes, require, character = T) 
+if (sum(as.numeric(!packages %in% installed.packages())) != 0) {
+  installer <- packages[!packages %in% installed.packages()]
+  for (i in 1:length(installer)) {
+    install.packages(installer, dependencies = TRUE)
+    break()
+  }
+  sapply(packages, require, character = TRUE)
 } else {
-  sapply(pacotes, require, character = T) 
+  sapply(packages, require, character = TRUE)
 }
 
-# importação da base de dados
-clientesdata <- read.csv("Wholesale customers data.csv")
-save(clientesdata, file = "clientesdata.RData")
+# Importing the dataset
+customer_data <- read.csv("Wholesale customers data.csv")
+save(customer_data, file = "customer_data.RData")
 
-# Visualização da base de dados
-View(clientesdata)
-##mostrar apenas 10 primeiiras no rmakrdown
+# Visualizing the dataset
+View(customer_data)
+## Display only the first 10 rows in markdown
 
-# Contagem das categorias por variável
+# Counting categories per variable
 
-map(clientesdata[, c("Channel", "Region")], ~ summary(as.factor(.)))
-# Onde: Channel(1) = Hotel/Restaurante/Café; Channel(2) = Varejo.
-# Region(1) = Lisboa; Region(2) = Porto; Region(3) = Outra Região.
+map(customer_data[, c("Channel", "Region")], ~ summary(as.factor(.)))
+# Where: Channel(1) = Hotel/Restaurant/Cafe; Channel(2) = Retail.
+# Region(1) = Lisbon; Region(2) = Porto; Region(3) = Other Region.
 
-# Olhando o "tipo" das variáveis do nosso banco de dados:
-glimpse(clientesdata)
+# Checking the data types of our database:
+glimpse(customer_data)
 
-# como as variáveis categóricas estão codificadas como numéricas, vamos alterá-las para fatores:
-clientesdata2 <- clientesdata
-clientesdata2$Channel <- as.factor(clientesdata$Channel)
-clientesdata2$Region <- as.factor(clientesdata$Region)
+# Since categorical variables are encoded as numeric, let's change them to factors:
+customer_data2 <- customer_data
+customer_data2$Channel <- as.factor(customer_data$Channel)
+customer_data2$Region <- as.factor(customer_data$Region)
 
-# Como temos variáveis categóricas e numéricas no banco de dados, vamos separar as variáveis em 
-# em dois bancos de dados para que possamos criar 2 matrizes de distância. Esse procedimento se faz
-# necessário pois usaremos métodos de cálculo de distâncias diferentes para variáveis numéricas e 
-# categóricas. Depois combinaremos as matrizes e faremos a clusterização na matriz combinada.
+# As we have both categorical and numerical variables in the database, let's separate the variables into two databases so that we can create two distance matrices. This procedure is necessary because we will use different distance calculation methods for numerical and categorical variables. After that, we will combine the matrices and perform clustering on the combined matrix.
 
-# Separando as variáveis em numéricas e categóricas:
-dados_numericos <- clientesdata2[, c("Fresh", "Milk", "Grocery", "Frozen", "Detergents_Paper", "Delicassen")]
-dados_categoricos <- clientesdata2[, c("Channel", "Region")]
+# Separating variables into numerical and categorical:
+numeric_data <- customer_data2[, c("Fresh", "Milk", "Grocery", "Frozen", "Detergents_Paper", "Delicassen")]
+categorical_data <- customer_data2[, c("Channel", "Region")]
 
-# Padronizando as variáveis numéricas
-dados_padronizados <- as.data.frame(scale(dados_numericos))
-# agora, todas as variáveis numéricas passam a ter média = 0 e desvio padrão = 1.
+# Standardizing numerical variables
+standardized_data <- as.data.frame(scale(numeric_data))
+# Now, all numerical variables have a mean of 0 and a standard deviation of 1.
 
-# dummificando as variáveis categóricas
-dados_dummies <- dummy_columns(.data = dados_categoricos,
-                                         select_columns = "Channel",
-                                         remove_selected_columns = T,
-                                         remove_most_frequent_dummy = T)
+# Creating dummy variables for categorical variables
+dummy_data <- dummy_columns(.data = categorical_data,
+                            select_columns = "Channel",
+                            remove_selected_columns = TRUE,
+                            remove_most_frequent_dummy = TRUE)
 
-dados_dummies <- dummy_columns(.data = dados_dummies,
-                               select_columns = "Region",
-                               remove_selected_columns = T,
-                               remove_most_frequent_dummy = T)
+dummy_data <- dummy_columns(.data = dummy_data,
+                            select_columns = "Region",
+                            remove_selected_columns = TRUE,
+                            remove_most_frequent_dummy = TRUE)
 
-# Criando nossas matrizes
-matriz_D_numerica <- dados_padronizados %>% dist(method = "euclidean")
-matriz_D_categorica <- dados_dummies %>% dist(method = "binary")
+# Creating our matrices
+numeric_D_matrix <- standardized_data %>% dist(method = "euclidean")
+categorical_D_matrix <- dummy_data %>% dist(method = "binary")
 
-# Unindo as matrizes
-dist_total <- matriz_D_categorica + matriz_D_numerica
+# Combining the matrices
+total_distance_matrix <- numeric_D_matrix + categorical_D_matrix
 
-# Visualizando a matriz de dissimilaridades
-data.matrix(dist_total) %>% 
+# Visualizing the dissimilarity matrix
+data.matrix(total_distance_matrix) %>% 
   kable() %>%
   kable_styling(bootstrap_options = "striped", 
                 full_width = FALSE, 
                 font_size = 20)
-## mostrar apenas 10 linhas no markdown
-# Como nossas distancias são relativamente pequenas, iremos usar o método de encadeamento completo
-# durante a clusterização hierárquica.
+## Display only the first 10 rows in markdown
+# Since our distances are relatively small, we will use the complete linkage method during hierarchical clustering.
 
-# Elaboração da clusterização hierárquica
-cluster_hier <- agnes(x = dist_total, method = "complete")
+# Hierarchical clustering
+hierarchical_cluster <- agnes(x = total_distance_matrix, method = "complete")
 
-# Construção do dendrograma
+# Constructing the dendrogram
 dev.off()
-dendo1 <- fviz_dend(x = cluster_hier, show_labels = FALSE)
-dendo1
-## podemos notar a presença de alguns clusters bem definidos e outros nem tanto... Provavelmente
-## temos a presença de alguns outliers no banco de dados.
+dendrogram1 <- fviz_dend(x = hierarchical_cluster, show_labels = FALSE)
+dendrogram1
+## We can see the presence of some well-defined clusters and others not so much... Probably,
+## there are some outliers in the database.
 
-# Após a análise do dendrograma em um processo de clusterização hierárquica, podemos fazer escolha do número de 
-# do número de clusters observando a estrutura do dendrograma e identificando os cortes que 
-# parecem mais significativos ou relevantes para o nosso objetivo.
+# After analyzing the dendrogram in a hierarchical clustering process, we can choose the number of clusters by observing the dendrogram structure and identifying the cuts that seem more significant or relevant for our objective.
 
-
-# Dendrograma com visualização dos clusters
-# Definindo altura 7 para a definição dos clusters do dendograma.
-dendo_clusters <- fviz_dend(x = cluster_hier,
+# Dendrogram with cluster visualization
+# Setting the height to 7 to define the dendrogram clusters.
+dendrogram_clusters <- fviz_dend(x = hierarchical_cluster,
           h = 7,
-          color_labels_by_k = F,
-          rect = T,
-          rect_fill = T,
+          color_labels_by_k = FALSE,
+          rect = TRUE,
+          rect_fill = TRUE,
           lwd = 1,
           ggtheme = theme_bw(),
           show_labels = FALSE)
 
-dendo_clusters
-## podem ser visualizados 12 clusters
+dendrogram_clusters
+## We can see approximately 12 clusters
 
-# Criando um banco de dados com todos os dados usados na criação das matrizes:
-dados_completos <- cbind(dados_padronizados, Channel_2=dados_dummies$Channel_2, Region_1=dados_dummies$Region_1, Region_2=dados_dummies$Region_2)
+# Creating a database with all the data used in creating the matrices:
+complete_data <- cbind(standardized_data, Channel_2=dummy_data$Channel_2, Region_1=dummy_data$Region_1, Region_2=dummy_data$Region_2)
 
-# Criando variável categórica para indicação do cluster no banco de dados
-## O argumento 'k' indica a quantidade de clusters.
+# Creating a categorical variable to indicate the cluster in the database
+## The 'k' argument indicates the number of clusters.
 
-dados_completos$cluster_hier <- factor(cutree(tree = cluster_hier, k = 12))
-## _ps: 12 é o numero de clusters criados pelo corte na altura 7
+complete_data$cluster_hierarchical <- factor(cutree(tree = hierarchical_cluster, k = 12))
+## _ps: 12 is the number of clusters created by cutting at height 7
 
-# A seguir, vamos verificar se todas as variáveis ajudam na formação dos grupos
+# Next, let's check if all variables help in forming the groups
 
-summary(anova_channel2 <- aov(formula = Channel_2 ~ cluster_hier,
-                                data = dados_completos))
+summary(anova_channel2 <- aov(formula = Channel_2 ~ cluster_hierarchical,
+                                data = complete_data))
 
-summary(anova_region1 <- aov(formula = Region_1 ~ cluster_hier,
-                              data = dados_completos))
+summary(anova_region1 <- aov(formula = Region_1 ~ cluster_hierarchical,
+                              data = complete_data))
 
-summary(anova_region2 <- aov(formula = Region_2 ~ cluster_hier,
-                             data = dados_completos))
+summary(anova_region2 <- aov(formula = Region_2 ~ cluster_hierarchical,
+                             data = complete_data))
 
-summary(anova_fresh <- aov(formula = Fresh ~ cluster_hier,
-                             data = dados_completos))
+summary(anova_fresh <- aov(formula = Fresh ~ cluster_hierarchical,
+                             data = complete_data))
 
-summary(anova_milk <- aov(formula = Milk ~ cluster_hier,
-                           data = dados_completos))
+summary(anova_milk <- aov(formula = Milk ~ cluster_hierarchical,
+                           data = complete_data))
 
-summary(anova_grocery <- aov(formula = Grocery ~ cluster_hier,
-                           data = dados_completos))
+summary(anova_grocery <- aov(formula = Grocery ~ cluster_hierarchical,
+                           data = complete_data))
 
-summary(anova_frozen <- aov(formula = Frozen ~ cluster_hier,
-                             data = dados_completos))
+summary(anova_frozen <- aov(formula = Frozen ~ cluster_hierarchical,
+                             data = complete_data))
 
-summary(anova_detergents <- aov(formula = Detergents_Paper ~ cluster_hier,
-                            data = dados_completos))
+summary(anova_detergents <- aov(formula = Detergents_Paper ~ cluster_hierarchical,
+                            data = complete_data))
 
-summary(anova_delicassen <- aov(formula = Delicassen ~ cluster_hier,
-                            data = dados_completos))
+summary(anova_delicassen <- aov(formula = Delicassen ~ cluster_hierarchical,
+                            data = complete_data))
 
-# Para um nível de confiança de 95%, apenas a variável "Region_1" não pode ser considerada significativa
-# para a formação de pelo menos 1 cluster.
+# For a 95% confidence level, only the variable "Region_1" cannot be considered significant
+# for the formation of at least one cluster.
 
-# Estatísticas descritivas dos clusters por variável
+# Descriptive statistics of clusters by variable
 
-# Estatísticas descritivas da variável 'Fresh'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Fresh' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Fresh),
     sd = sd(Fresh),
     min = min(Fresh),
     max = max(Fresh))
 
-# Estatísticas descritivas da variável 'Milk'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Milk' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Milk),
     sd = sd(Milk),
     min = min(Milk),
     max = max(Milk))
 
-# Estatísticas descritivas da variável 'Grocery'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Grocery' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Grocery),
     sd = sd(Grocery),
     min = min(Grocery),
     max = max(Grocery))
 
-# Estatísticas descritivas da variável 'Frozen'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Frozen' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Frozen),
     sd = sd(Frozen),
     min = min(Frozen),
     max = max(Frozen))
 
-# Estatísticas descritivas da variável 'Detergents_Paper'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Detergents_Paper' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Detergents_Paper),
     sd = sd(Detergents_Paper),
     min = min(Detergents_Paper),
     max = max(Detergents_Paper))
 
-# Estatísticas descritivas da variável 'Delicassen'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Delicassen' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Delicassen),
     sd = sd(Delicassen),
     min = min(Delicassen),
     max = max(Delicassen))
 
-# Estatísticas descritivas da variável 'Channel_2'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Channel_2' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Channel_2),
     sd = sd(Channel_2),
     min = min(Channel_2),
     max = max(Channel_2))
 
-# Estatísticas descritivas da variável 'Region_1'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Region_1' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Region_1),
     sd = sd(Region_1),
     min = min(Region_1),
     max = max(Region_1))
 
-# Estatísticas descritivas da variável 'Region_2'
-group_by(dados_completos, cluster_hier) %>%
+# Descriptive statistics of the 'Region_2' variable
+group_by(complete_data, cluster_hierarchical) %>%
   summarise(
     mean = mean(Region_2),
     sd = sd(Region_2),
     min = min(Region_2),
     max = max(Region_2))
 
-## Através das estatísticas, podemos conpreender as características de cada cluster, e conseguentemente
-## a rede varejista saberia como melhor adequar o direcionamento de seus recursos para atender
-## a demanda de seus clientes. Nesse nosso exemplo, podemos ainda perceber a presença de outliers, 
-## pois os clusters 7, 8, 9, 10, 11 e 12 são formados por uma única observação. Poderíamos remover
-## as observações outliers e rodar novamente o algorítmo de clusterização hierarquica. Entretanto, 
-## como os outliers representam uma fração muito pequena dos dados (6/440), e estão isolados em clusters 
-## próprios, podemos considera-los como irrelevantes para a formação dos demais clusters. Portanto,
-## vamos seguir em frente com o objetivo incial e executar agora uma clusterização "k-means" com todas
-## as observações do banco de dados (inclusive as obs. outliers) e 12 clusters determinados a priori. 
-## Ao final, poderemos comparar os resultados de ambos os procedimentos.
+## Through the statistics, we can understand the characteristics of each cluster, and consequently,
+## the retail network would know how to better allocate its resources to meet the demand of its customers.
+## In this example, we can also notice the presence of outliers because clusters 7, 8, 9, 10, 11, and 12
+## are formed by a single observation. We could remove the outlier observations and rerun the hierarchical
+## clustering algorithm. However, since the outliers represent a very small fraction of the data (6/440)
+## and are isolated in their clusters, we can consider them irrelevant for the formation of the other clusters.
+## Therefore, we will proceed with the initial objective and now execute a "k-means" clustering with all
+## observations in the database (including outlier observations) and 12 clusters determined a priori. In the end,
+## we can compare the results of both procedures.
 
-# Método de Elbow para identificação do número ótimo de clusters
-fviz_nbclust(dados_completos2[,1:9], kmeans, method = "wss", k.max = 30)
-## o método de elbow parece nos indicar que o numero ótimo de cluster realmente se encontra por
-## volta dos números 11 e 12, conforme nossa análise do dendograma no procedimento hierárquico.
+# Elbow Method to identify the optimal number of clusters
+fviz_nbclust(complete_data[,1:9], kmeans, method = "wss", k.max = 30)
+## The elbow method seems to indicate that the optimal number of clusters is around 11 and 12, as we analyzed from the dendrogram in the hierarchical procedure.
 
-# Elaboração da clusterização não hieráquica k-means
-cluster_kmeans <- kmeans(select(dados_completos, -cluster_hier),
+# Non-hierarchical k-means clustering
+kmeans_cluster <- kmeans(select(complete_data, -cluster_hierarchical),
                          centers = 12)
 
-# Criando variável categórica para indicação do cluster no banco de dados
-dados_completos2 <- dados_completos
-dados_completos2$cluster_K <- factor(cluster_kmeans$cluster)
+# Creating a categorical variable to indicate the cluster in the database
+complete_data2 <- complete_data
+complete_data2$cluster_Kmeans <- factor(kmeans_cluster$cluster)
 
-summary(anova_channel2 <- aov(formula = Channel_2 ~ cluster_K,
-                              data = dados_completos2))
+summary(anova_channel2 <- aov(formula = Channel_2 ~ cluster_Kmeans,
+                              data = complete_data2))
 
-summary(anova_region1 <- aov(formula = Region_1 ~ cluster_K,
-                             data = dados_completos2))
+summary(anova_region1 <- aov(formula = Region_1 ~ cluster_Kmeans,
+                             data = complete_data2))
 
-summary(anova_region2 <- aov(formula = Region_2 ~ cluster_K,
-                             data = dados_completos2))
+summary(anova_region2 <- aov(formula = Region_2 ~ cluster_Kmeans,
+                             data = complete_data2))
 
-summary(anova_fresh <- aov(formula = Fresh ~ cluster_K,
-                           data = dados_completos2))
+summary(anova_fresh <- aov(formula = Fresh ~ cluster_Kmeans,
+                             data = complete_data2))
 
-summary(anova_milk <- aov(formula = Milk ~ cluster_K,
-                          data = dados_completos2))
+summary(anova_milk <- aov(formula = Milk ~ cluster_Kmeans,
+                           data = complete_data2))
 
-summary(anova_grocery <- aov(formula = Grocery ~ cluster_K,
-                             data = dados_completos2))
+summary(anova_grocery <- aov(formula = Grocery ~ cluster_Kmeans,
+                           data = complete_data2))
 
-summary(anova_frozen <- aov(formula = Frozen ~ cluster_K,
-                            data = dados_completos2))
+summary(anova_frozen <- aov(formula = Frozen ~ cluster_Kmeans,
+                             data = complete_data2))
 
-summary(anova_detergents <- aov(formula = Detergents_Paper ~ cluster_K,
-                                data = dados_completos2))
+summary(anova_detergents <- aov(formula = Detergents_Paper ~ cluster_Kmeans,
+                            data = complete_data2))
 
-summary(anova_delicassen <- aov(formula = Delicassen ~ cluster_K,
-                                data = dados_completos2))
+summary(anova_delicassen <- aov(formula = Delicassen ~ cluster_Kmeans,
+                            data = complete_data2))
 
-## diferente do procedimento hierárquico, temso aqui que todas as variáveis são significantes para a
-## formação de pelo menos 1 cluster a um nível de confiança de 95%.
+## Unlike the hierarchical procedure, here we see that all variables are significant for
+## the formation of at least one cluster at a 95% confidence level.
 
-# Estatísticas descritivas dos clusters por variável
+# Descriptive statistics of clusters by variable
 
-# Estatísticas descritivas da variável 'Fresh'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Fresh' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Fresh),
     sd = sd(Fresh),
     min = min(Fresh),
     max = max(Fresh))
 
-# Estatísticas descritivas da variável 'Milk'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Milk' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Milk),
     sd = sd(Milk),
     min = min(Milk),
     max = max(Milk))
 
-# Estatísticas descritivas da variável 'Grocery'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Grocery' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Grocery),
     sd = sd(Grocery),
     min = min(Grocery),
     max = max(Grocery))
 
-# Estatísticas descritivas da variável 'Frozen'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Frozen' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Frozen),
     sd = sd(Frozen),
     min = min(Frozen),
     max = max(Frozen))
 
-# Estatísticas descritivas da variável 'Detergents_Paper'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Detergents_Paper' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Detergents_Paper),
     sd = sd(Detergents_Paper),
     min = min(Detergents_Paper),
     max = max(Detergents_Paper))
 
-# Estatísticas descritivas da variável 'Delicassen'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Delicassen' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Delicassen),
     sd = sd(Delicassen),
     min = min(Delicassen),
     max = max(Delicassen))
 
-# Estatísticas descritivas da variável 'Channel_2'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Channel_2' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Channel_2),
     sd = sd(Channel_2),
     min = min(Channel_2),
     max = max(Channel_2))
 
-# Estatísticas descritivas da variável 'Region_1'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Region_1' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Region_1),
     sd = sd(Region_1),
     min = min(Region_1),
     max = max(Region_1))
 
-# Estatísticas descritivas da variável 'Region_2'
-group_by(dados_completos2, cluster_K) %>%
+# Descriptive statistics of the 'Region_2' variable
+group_by(complete_data2, cluster_Kmeans) %>%
   summarise(
     mean = mean(Region_2),
     sd = sd(Region_2),
     min = min(Region_2),
     max = max(Region_2))
 
-# Comparando os resultados dos esquemas hierárquico e não hierárquico
-dados_completos2 %>%
-  select(Channel_2, cluster_hier, cluster_K) %>%
+# Comparing the results of the hierarchical and non-hierarchical approaches
+complete_data2 %>%
+  select(Channel_2, cluster_hierarchical, cluster_Kmeans) %>%
   arrange(Channel_2) %>% 
   kable() %>%
   kable_styling(bootstrap_options = "striped",
                 full_width = FALSE,
                 font_size = 20)
-## mostrar apenas 10 primeiras linhas
-# podemos reparar uma grande diferença na distribuiçao das observaçoes para cada cluster
+## Show only the first 10 rows
+# We can see a significant difference in the distribution of observations for each cluster.
 
-# Comparando atraves de uma matriz de confusao
-# Criar a tabela de contingência
-tabela_contingencia <- table(dados_completos2$cluster_hier, dados_completos2$cluster_K)
+# Comparing through a confusion matrix
+# Create the contingency table
+contingency_table <- table(complete_data2$cluster_hierarchical, complete_data2$cluster_Kmeans)
 
-# Exibir a matriz de confusão
-matriz_confusao <- prop.table(tabela_contingencia, margin = 1)
+# Display the confusion matrix
+confusion_matrix <- prop.table(contingency_table, margin = 1)
 
-# Exibir a matriz de confusão formatada
-print(matriz_confusao, digits = 2)
+# Display the formatted confusion matrix
+print(confusion_matrix, digits = 2)
 
-# Finalizando os 2 procedimentos e analisando a matriz de confusao, podemos perceber que os 2 procedimentos
-# tenderam a agrupar as observações de maneira semelhante. A matriz de confusão nos mostra a
-# porcentagem de observaçoes que estavao agrupadas em um mesmo cluster durante a clusterização 
-# hierárquica que continuam agrupadas em um mesmo cluster após a clusterização "k-means". É possível
-# reparar que não ocorreu nenhuma grande dispersão de observações, e os 2 clusters do procedimento hierárquico
-# que sofreram uma maior dispersão de observações, tiveram, aproximadamente, 50% e 70% dessas observações 
-# agrupadas juntas novamente.
+# Concluding both procedures and analyzing the confusion matrix, we can see that both procedures
+# tended to group the observations in a similar way. The confusion matrix shows us the
+# percentage of observations that were grouped in the same cluster during the hierarchical clustering
+# and remain grouped together in the same cluster after the "k-means" clustering. It is possible
+# to notice that there was no major dispersion of observations, and the two clusters in the hierarchical
+# procedure that had the greatest dispersion of observations had approximately 50% and 70% of these observations
+# grouped together again.
 
-# Assim, fica demonstrado a eficácia dos algorítmos de clusterização para o agrupamento de observações,
-# e como processo de usar o "output" do método hieráquico como "input" do método k-means pode ser
-# uma estratégia válida para esse tipo de análise.
+# Thus, the effectiveness of clustering algorithms for grouping observations is demonstrated,
+# and the process of using the output of the hierarchical method as input for the "k-means" method can be
+# a valid strategy for this type of analysis.
+
 
