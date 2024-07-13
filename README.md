@@ -1,4 +1,4 @@
-# Rafael_Portfolio
-Data Science projects
+# My Portfolio
+Please visit the link below for an optimized view of my portfolio:
 
 [Link to my Landing Page](https://rafaelpd.netlify.app)
